@@ -21,7 +21,7 @@ mcp_servers:
     # Local BytePlus Ark MCP server (StreamableHTTP transport)
     url: http://seedance-mcp:8765/mcp
     connect_timeout: 30
-    timeout: 300
+    timeout: 900
 
 # ── Skills Configuration ──────────────────────────────────────────────────────
 skills:

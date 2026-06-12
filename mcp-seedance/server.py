@@ -321,7 +321,7 @@ def get_task_status(task_id: str) -> dict:
     resp.raise_for_status()
     return resp.json()
 
-def poll_task(task_id: str, timeout: int = 600, interval: int = 10) -> dict:
+def poll_task(task_id: str, timeout: int = 900, interval: int = 10) -> dict:
     logger.info(f"Polling task {task_id}...")
     deadline = time.time() + timeout
     while time.time() < deadline:

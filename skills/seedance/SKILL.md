@@ -19,6 +19,7 @@ Generate AI videos using ByteDance Seedance via the **`seedance_generate_video`*
 2. **Do NOT delegate to a subagent** — call the tool directly yourself.
 3. **Always upload the generated video to Google Drive and return the shareable link** — direct Slack file uploads are disabled due to missing files:write scopes.
 4. **Never output local paths or use local MEDIA tags** — if Google Drive upload fails, return a clear error message directly to the user. Do NOT mention local folders or paths.
+5. **Always use the high-detail `seedance-2.0` model** as the default. Do NOT automatically fall back to `seedance-2.0-fast` or any other model on timeout or delay, as the connection timeout has been extended to 15 minutes to support slower high-detail generations. Only use the fast model if the user explicitly requests "fast" or "quick".
 
 ---
 
