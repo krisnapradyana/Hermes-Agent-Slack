@@ -321,11 +321,11 @@ def get_task_status(task_id: str) -> dict:
     resp.raise_for_status()
     return resp.json()
 
-def poll_task(task_id: str, timeout: int = 900, interval: int = 10) -> dict:
+async def poll_task(task_id: str, timeout: int = 900, interval: int = 10) -> dict:
     logger.info(f"Polling task {task_id}...")
     deadline = time.time() + timeout
     while time.time() < deadline:
-        data = get_task_status(task_id)
+        data = await anyio.to_thread.run_sync(get_task_status, task_id)
         status = data.get("status", "")
         logger.info(f"Task {task_id} status: {status}")
         if status == "succeeded":
@@ -333,7 +333,7 @@ def poll_task(task_id: str, timeout: int = 900, interval: int = 10) -> dict:
         elif status in ("failed", "cancelled"):
             logger.error(f"Task {task_id} failed or cancelled. Full response: {json.dumps(data)}")
             raise RuntimeError(f"Task {task_id} ended with status: {status}. Detail: {json.dumps(data)}")
-        time.sleep(interval)
+        await anyio.sleep(interval)
     raise TimeoutError(f"Task {task_id} did not complete within {timeout}s")
 
 def resolve_model(name: str) -> str:
@@ -366,7 +366,7 @@ def seedance_get_task(task_id: str) -> str:
 
 
 @mcp.tool()
-def seedance_generate_video(
+async def seedance_generate_video(
     prompt: str,
     model: str = DEFAULT_MODEL,
     resolution: str = "720p",
@@ -396,10 +396,10 @@ def seedance_generate_video(
         "duration": duration,
     }
 
-    task = create_task(payload)
+    task = await anyio.to_thread.run_sync(create_task, payload)
     task_id = task.get("id") or task.get("task_id")
     
-    result = poll_task(task_id)
+    result = await poll_task(task_id)
     video_url = (
         result.get("content", {}).get("video_url")
         or result.get("video_url")
@@ -418,7 +418,7 @@ def seedance_generate_video(
 
 
 @mcp.tool()
-def seedance_generate_video_from_image(
+async def seedance_generate_video_from_image(
     prompt: str,
     image_url: str,
     model: str = "seedance-1.0-pro",
@@ -452,10 +452,10 @@ def seedance_generate_video_from_image(
         "duration": duration,
     }
 
-    task = create_task(payload)
+    task = await anyio.to_thread.run_sync(create_task, payload)
     task_id = task.get("id") or task.get("task_id")
     
-    result = poll_task(task_id)
+    result = await poll_task(task_id)
     video_url = (
         result.get("content", {}).get("video_url")
         or result.get("video_url")
