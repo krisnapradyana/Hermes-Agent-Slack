@@ -1,0 +1,33 @@
+provider: anthropic
+model:
+  default: claude-fable-5
+  auxiliary: claude-haiku-4-5
+
+display:
+  # Suppress mid-turn "thinking" step messages in Slack
+  show_reasoning: false
+  # Don't post intermediate assistant updates while processing
+  interim_assistant_messages: false
+  # Silence tool progress spam (off | new | all | verbose)
+  tool_progress: "off"
+
+gateway:
+  # Only send the final result for background/cron jobs, not every step
+  background_notifications: result
+
+# ── MCP Servers ──────────────────────────────────────────────────────────────
+mcp_servers:
+  seedance:
+    # Local BytePlus Ark MCP server (StreamableHTTP transport)
+    url: http://seedance-mcp:8765/mcp
+    connect_timeout: 30
+    timeout: 300
+
+# ── Skills Configuration ──────────────────────────────────────────────────────
+skills:
+  external_dirs:
+    - /opt/data/custom-skills
+
+# ── Google Drive Settings ────────────────────────────────────────────────────
+google_drive:
+  folder_id: "1-2hES89_Md5Mkhqo_a5EHRk-eJuNxlCT"  # Paste your Google Drive Folder ID here (from Google Drive URL) to upload videos directly into it

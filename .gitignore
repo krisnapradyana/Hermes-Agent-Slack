@@ -1,0 +1,18 @@
+# Environment variables and secrets
+.env
+
+# Generated videos and client credentials
+documents/
+
+# Agent runtime memories and SQLite database state
+memory/
+
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS specific files
+.DS_Store
+Thumbs.db

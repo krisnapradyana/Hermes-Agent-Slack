@@ -1,0 +1,53 @@
+services:
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-local-agent
+    restart: unless-stopped
+    ports:
+      - "8642:8642"
+    volumes:
+      - ./config.yaml:/opt/data/custom-config.yaml
+      - ./.env:/opt/data/.env
+      - ./skills:/opt/data/custom-skills
+      - ./memory:/opt/data/memories
+      - ./documents:/documents
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+    command: |
+      sh -c "/opt/hermes/.venv/bin/python3 -c \"
+      import yaml
+      from pathlib import Path
+      h = Path('/opt/data/custom-config.yaml')
+      c = Path('/opt/data/config.yaml')
+      if h.exists():
+          hc = yaml.safe_load(h.read_text()) or {}
+          cc = yaml.safe_load(c.read_text()) or {} if c.exists() else {}
+          def merge(a, b):
+              for k, v in b.items():
+                  if isinstance(v, dict) and k in a and isinstance(a[k], dict): merge(a[k], v)
+                  else: a[k] = v
+          merge(cc, hc)
+          c.write_text(yaml.safe_dump(cc))
+      \" && hermes gateway run"
+    depends_on:
+      - seedance-mcp
+
+  seedance-mcp:
+    build: ./mcp-seedance
+    container_name: seedance-mcp-server
+    restart: unless-stopped
+    environment:
+      - ARK_API_KEY=${FAL_KEY}
+      - MCP_PORT=8765
+    ports:
+      - "8765:8765"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
