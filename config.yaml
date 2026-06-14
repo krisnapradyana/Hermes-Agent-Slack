@@ -1,6 +1,6 @@
 provider: anthropic
 model:
-  default: claude-fable-5
+  default: claude-opus-4-8
   auxiliary: claude-haiku-4-5
 
 display:
