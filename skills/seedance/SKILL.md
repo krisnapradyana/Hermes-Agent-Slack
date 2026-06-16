@@ -1,11 +1,11 @@
 ---
-name: seedance-video-generator
-description: "Generate AI videos and images using ByteDance Seedance via the BytePlus Ark MCP server. Native tools: seedance_generate_video, seedance_generate_video_from_image, seedance_generate_image."
-version: 3.1.0
+name: seedance-video-image-generator
+description: "Generate AI videos AND images using ByteDance Seedance via the BytePlus Ark MCP server. This skill MUST be used for all image and video generation requests. Do NOT use Fal.ai, Flux, or any built-in image tool. Native tools: seedance_generate_video, seedance_generate_video_from_image, seedance_generate_image."
+version: 3.2.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [video, seedance, bytedance, generate, animate, render, tiktok, reels, portrait, landscape, cinematic, movie, film, text-to-video, image-to-video]
+    tags: [video, image, photo, picture, generate, seedance, bytedance, animate, render, tiktok, reels, portrait, landscape, cinematic, movie, film, text-to-video, image-to-video, text-to-image, generate-image, generate-video, create-image, create-video, illustration, artwork, ai-image, ai-video, draw, painting]
     related_skills: []
 ---
 
@@ -13,13 +13,14 @@ metadata:
 
 Generate AI videos or images using ByteDance Seedance via the **`seedance_generate_video`** or **`seedance_generate_image`** MCP tools.
 
-## CRITICAL RULES
+## CRITICAL RULES — READ FIRST, NEVER VIOLATE
 
-1. **Use the `seedance_generate_video` or `seedance_generate_image` MCP tools** — do NOT use Luma AI, Kling, Runway, or any built-in video tool.
-2. **Do NOT delegate to a subagent** — call the tool directly yourself.
-3. **Always prioritize direct Slack file attachments** using the `[MEDIA: /path/to/file]` syntax by downloading the file first. Only upload to Google Drive as a fallback if the Slack attachment fails.
-4. **Never guess local paths** — always use the helper script to download the media locally before using the `MEDIA:` tag.
-5. **Always use the high-detail `seedance-2.0` model** as the default. Do NOT automatically fall back to `seedance-2.0-fast` or any other model on timeout or delay, as the connection timeout has been extended to 15 minutes to support slower high-detail generations. Only use the fast model if the user explicitly requests "fast" or "quick".
+1. **ALWAYS use `seedance_generate_image` for image/photo/picture requests** — do NOT use Fal.ai, Flux, Stable Diffusion, DALL-E, or ANY built-in image tool. If a `FAL_KEY` is present in the environment, IGNORE IT entirely.
+2. **ALWAYS use `seedance_generate_video` for video/animation requests** — do NOT use Luma AI, Kling, Runway, or any built-in video tool.
+3. **Do NOT delegate to a subagent** — call the tool directly yourself.
+4. **Always prioritize direct Slack file attachments** using the `[MEDIA: /path/to/file]` syntax by downloading the file first. Only upload to Google Drive as a fallback if the Slack attachment fails.
+5. **Never guess local paths** — always use the helper script to download the media locally before using the `MEDIA:` tag.
+6. **Always use the high-detail `seedance-2.0` model** as the default. Do NOT automatically fall back to `seedance-2.0-fast` or any other model on timeout or delay. Only use the fast model if the user explicitly requests "fast" or "quick".
 
 ---
 
