@@ -31,3 +31,29 @@ skills:
 # ── Google Drive Settings ────────────────────────────────────────────────────
 google_drive:
   folder_id: "1-2hES89_Md5Mkhqo_a5EHRk-eJuNxlCT"  # Paste your Google Drive Folder ID here (from Google Drive URL) to upload videos directly into it
+
+# ── Cleanup Settings ─────────────────────────────────────────────────────────
+# Controls when temporary generated files (videos, documents, etc.) are removed.
+cleanup:
+  # Delete the temp file immediately after a successful upload/delivery
+  on_success: true
+
+  # Delete the temp file even when upload/delivery fails
+  # Set to false to keep files for manual inspection/retry after failures
+  on_failure: false
+
+  # Run a sweep of stale temp files when the container starts up
+  on_startup: true
+
+  # Maximum age (in seconds) before a temp file is considered stale and eligible
+  # for cleanup. Only applies to on_startup sweep. Default: 3600 (1 hour)
+  max_age_seconds: 3600
+
+  # Directory where temporary generated files are stored
+  temp_dir: "/tmp"
+
+  # Glob patterns of temp file names to target during cleanup sweeps
+  temp_patterns:
+    - "seedance_*.mp4"
+    - "hermes_doc_*.tmp"
+    - "hermes_gen_*"

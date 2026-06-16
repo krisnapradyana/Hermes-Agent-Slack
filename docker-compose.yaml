@@ -20,7 +20,12 @@ services:
           memory: 2g
         reservations:
           memory: 512m
-    command: sh -c "/opt/hermes/.venv/bin/python3 /opt/data/env_sync.py & hermes gateway run"
+    command: >
+      sh -c "
+        /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
+        /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py &&
+        hermes gateway run
+      "
     depends_on:
       - seedance-mcp
 

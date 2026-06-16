@@ -89,20 +89,31 @@ For image-to-video, use `seedance_generate_video_from_image` with an additional 
 
 ---
 
-## Step 4 — Download, Upload to Google Drive, and Clean Up (MANDATORY)
+## Step 4 — Download, Upload to Google Drive, and Clean Up
 
-Because direct Slack file uploads are disabled (due to missing files:write scopes in the Slack App token), you MUST use our robust helper script to download the video, upload it to Google Drive, share it publicly, and clean up the container's temporary files in a single step.
+Because direct Slack file uploads are disabled (due to missing files:write scopes in the Slack App token), you MUST use our robust helper script to download the video, upload it to Google Drive, share it publicly, and handle cleanup in a single step.
+
+**Cleanup is automatic and driven by `config.yaml` `cleanup.*` flags** (see below). You only need to pass override flags in special cases.
 
 1. Find the `google_drive.folder_id` in `config.yaml` if it exists.
 2. Call the helper script using the `terminal` tool:
-   - If a folder ID is specified in `config.yaml` (e.g. `1-2hES89_Md5Mkhqo_a5EHRk-eJuNxlCT`):
-     ```bash
-     python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE" --folder "FOLDER_ID_HERE"
-     ```
-   - If no folder ID is specified:
-     ```bash
-     python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE"
-     ```
+
+   **Standard call (cleanup follows config policy):**
+   ```bash
+   # With a folder ID:
+   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE" --folder "FOLDER_ID_HERE"
+
+   # Without a folder ID:
+   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE"
+   ```
+
+   **Optional cleanup override flags:**
+   | Flag | Effect |
+   |---|---|
+   | *(none)* | Uses `cleanup.on_success` and `cleanup.on_failure` from `config.yaml` |
+   | `--no-cleanup` | Never delete the temp file, regardless of config |
+   | `--cleanup-on-failure` | Delete the temp file even if the upload fails |
+
 3. The script will print the public Google Drive `webViewLink` on success.
 4. Return this link to the user in Slack with a message like:
    ```
@@ -117,7 +128,7 @@ Because direct Slack file uploads are disabled (due to missing files:write scope
    🔗 View/Download: <Google Drive Link>
    ```
 5. **CRITICAL - Return Error on Failure**: If the script fails (non-zero exit code) or does not output a valid Google Drive Link, you MUST return a clean error message to the user (e.g., "Error: Failed to upload the generated video to Google Drive. Please try again."). Do NOT output local paths (such as `/opt/data/...` or `/documents/...`), do NOT suggest grabbing the file locally, and do NOT use any `MEDIA:` tag referencing a local file.
-6. Do NOT leave any temporary files inside the container. The script automatically handles deleting the temporary file after upload.
+6. Temp file retention after failure is controlled by `cleanup.on_failure` in `config.yaml` (default: `false`, meaning the file is kept for inspection). Do NOT manually try to delete or reference it.
 
 ## Other Available Seedance Tools
 
