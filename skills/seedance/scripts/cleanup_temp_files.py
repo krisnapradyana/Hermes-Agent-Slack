@@ -29,7 +29,7 @@ CONFIG_PATHS = [
 DEFAULTS = {
     "on_startup":      True,
     "temp_dir":        "/tmp",
-    "temp_patterns":   ["seedance_*.mp4", "hermes_doc_*.tmp", "hermes_gen_*"],
+    "temp_patterns":   ["seedance_*.*", "hermes_doc_*.tmp", "hermes_gen_*"],
     "max_age_seconds": 3600,
 }
 

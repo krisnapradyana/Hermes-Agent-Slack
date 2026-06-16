@@ -54,6 +54,6 @@ cleanup:
 
   # Glob patterns of temp file names to target during cleanup sweeps
   temp_patterns:
-    - "seedance_*.mp4"
+    - "seedance_*.*"
     - "hermes_doc_*.tmp"
     - "hermes_gen_*"

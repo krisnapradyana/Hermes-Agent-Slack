@@ -1,7 +1,7 @@
 ---
 name: seedance-video-generator
-description: "Generate AI videos using ByteDance Seedance via the BytePlus Ark MCP server. Native tools: seedance_generate_video, seedance_generate_video_from_image."
-version: 3.0.0
+description: "Generate AI videos and images using ByteDance Seedance via the BytePlus Ark MCP server. Native tools: seedance_generate_video, seedance_generate_video_from_image, seedance_generate_image."
+version: 3.1.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
@@ -9,16 +9,16 @@ metadata:
     related_skills: []
 ---
 
-# Seedance Video Generator
+# Seedance Video & Image Generator
 
-Generate AI videos using ByteDance Seedance via the **`seedance_generate_video`** MCP tool.
+Generate AI videos or images using ByteDance Seedance via the **`seedance_generate_video`** or **`seedance_generate_image`** MCP tools.
 
 ## CRITICAL RULES
 
-1. **Use the `seedance_generate_video` MCP tool** — do NOT use Luma AI, Kling, Runway, or any built-in video tool.
+1. **Use the `seedance_generate_video` or `seedance_generate_image` MCP tools** — do NOT use Luma AI, Kling, Runway, or any built-in video tool.
 2. **Do NOT delegate to a subagent** — call the tool directly yourself.
-3. **Always upload the generated video to Google Drive and return the shareable link** — direct Slack file uploads are disabled due to missing files:write scopes.
-4. **Never output local paths or use local MEDIA tags** — if Google Drive upload fails, return a clear error message directly to the user. Do NOT mention local folders or paths.
+3. **Always prioritize direct Slack file attachments** using the `[MEDIA: /path/to/file]` syntax by downloading the file first. Only upload to Google Drive as a fallback if the Slack attachment fails.
+4. **Never guess local paths** — always use the helper script to download the media locally before using the `MEDIA:` tag.
 5. **Always use the high-detail `seedance-2.0` model** as the default. Do NOT automatically fall back to `seedance-2.0-fast` or any other model on timeout or delay, as the connection timeout has been extended to 15 minutes to support slower high-detail generations. Only use the fast model if the user explicitly requests "fast" or "quick".
 
 ---
@@ -72,8 +72,9 @@ Expand the user's idea into a rich cinematic description before calling the tool
 
 ---
 
-## Step 3 — Call `seedance_generate_video`
+## Step 3 — Call `seedance_generate_video` or `seedance_generate_image`
 
+**For Video:**
 ```json
 {
   "prompt": "<your enhanced prompt>",
@@ -85,50 +86,54 @@ Expand the user's idea into a rich cinematic description before calling the tool
 }
 ```
 
+**For Image:**
+```json
+{
+  "prompt": "<your enhanced prompt>",
+  "model": "seedance-2.0",
+  "aspect_ratio": "16:9"
+}
+```
+
 For image-to-video, use `seedance_generate_video_from_image` with an additional `image_url` parameter.
 
 ---
 
-## Step 4 — Download, Upload to Google Drive, and Clean Up
+## Step 4 — Download, Attach to Slack, and Google Drive Fallback
 
-Because direct Slack file uploads are disabled (due to missing files:write scopes in the Slack App token), you MUST use our robust helper script to download the video, upload it to Google Drive, share it publicly, and handle cleanup in a single step.
+We prioritize native Slack attachments using the `[MEDIA: /path/to/file]` tag. Because the API returns a CDN URL, you must first download the file locally using the helper script.
 
-**Cleanup is automatic and driven by `config.yaml` `cleanup.*` flags** (see below). You only need to pass override flags in special cases.
-
-1. Find the `google_drive.folder_id` in `config.yaml` if it exists.
-2. Call the helper script using the `terminal` tool:
-
-   **Standard call (cleanup follows config policy):**
+**Phase 1: Direct Slack Attachment (Priority)**
+1. Call the helper script with the `--download-only` flag to get a local path:
    ```bash
-   # With a folder ID:
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE" --folder "FOLDER_ID_HERE"
-
-   # Without a folder ID:
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_URL_HERE"
+   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --download-only
    ```
-
-   **Optional cleanup override flags:**
-   | Flag | Effect |
-   |---|---|
-   | *(none)* | Uses `cleanup.on_success` and `cleanup.on_failure` from `config.yaml` |
-   | `--no-cleanup` | Never delete the temp file, regardless of config |
-   | `--cleanup-on-failure` | Delete the temp file even if the upload fails |
-
-3. The script will print the public Google Drive `webViewLink` on success.
-4. Return this link to the user in Slack with a message like:
+2. The script will output `Local Path: /tmp/seedance_xxxx.mp4`.
+3. Reply to the user directly, embedding the path inside a `MEDIA` tag:
    ```
-   🎬 Your superhero golden retriever video is ready!
+   🎬 Your superhero golden retriever is ready!
 
-   📋 Specs:
-   • Model: Seedance 2.0 Fast
-   • Duration: 5 seconds
-   • Aspect ratio: 9:16 (portrait)
-   • Resolution: 480p
+   [MEDIA: /tmp/seedance_xxxx.mp4]
 
-   🔗 View/Download: <Google Drive Link>
+   📋 Specs: Seedance 2.0 Fast, 5s, 9:16 (portrait)
    ```
-5. **CRITICAL - Return Error on Failure**: If the script fails (non-zero exit code) or does not output a valid Google Drive Link, you MUST return a clean error message to the user (e.g., "Error: Failed to upload the generated video to Google Drive. Please try again."). Do NOT output local paths (such as `/opt/data/...` or `/documents/...`), do NOT suggest grabbing the file locally, and do NOT use any `MEDIA:` tag referencing a local file.
-6. Temp file retention after failure is controlled by `cleanup.on_failure` in `config.yaml` (default: `false`, meaning the file is kept for inspection). Do NOT manually try to delete or reference it.
+   *Note: If the Slack workspace has issues with large files, the MEDIA tag might silently fail to appear in Slack. Wait for the user's feedback.*
+
+**Phase 2: Google Drive Fallback**
+1. **If the user explicitly tells you that the attachment failed or the video is missing**, fallback to Google Drive.
+2. Find the `google_drive.folder_id` in `config.yaml` if it exists.
+3. Call the helper script **without** `--download-only`:
+   ```bash
+   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --folder "FOLDER_ID_HERE"
+   ```
+4. Return the generated Google Drive link to the user.
+
+**Optional cleanup override flags (for the helper script):**
+| Flag | Effect |
+|---|---|
+| *(none)* | Uses `cleanup.on_success` and `cleanup.on_failure` from `config.yaml` |
+| `--no-cleanup` | Never delete the temp file, regardless of config |
+| `--cleanup-on-failure` | Delete the temp file even if the upload fails |
 
 ## Other Available Seedance Tools
 

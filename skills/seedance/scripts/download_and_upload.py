@@ -92,6 +92,11 @@ def main() -> None:
     parser.add_argument("--url",    required=True,  help="CDN URL of the video")
     parser.add_argument("--folder", default=None,   help="Optional parent folder ID in Google Drive")
     parser.add_argument(
+        "--download-only",
+        action="store_true",
+        help="Skip Google Drive upload. Just download the file and return the local path.",
+    )
+    parser.add_argument(
         "--no-cleanup",
         action="store_true",
         help="Never delete the temp file, regardless of config settings",
@@ -113,12 +118,27 @@ def main() -> None:
 
     log(f"Cleanup policy → on_success={cleanup_on_success}, on_failure={cleanup_on_failure}")
 
-    temp_file = os.path.join(temp_dir, f"seedance_{uuid.uuid4().hex}.mp4")
+    from urllib.parse import urlparse
+    parsed_url = urlparse(args.url)
+    _, ext = os.path.splitext(parsed_url.path)
+    if not ext:
+        ext = ".mp4"  # Fallback
+    temp_file = os.path.join(temp_dir, f"seedance_{uuid.uuid4().hex}{ext}")
     success = False
 
     try:
         # 1. Download to temporary path
         download_video(args.url, temp_file)
+
+        if args.download_only:
+            log("Download only requested. Skipping Google Drive upload.")
+            success = True
+            cleanup_on_success = False  # Must keep file so Slack gateway can read it
+            print("\n" + "=" * 60)
+            print("SUCCESS: File downloaded locally.")
+            print(f"Local Path: {temp_file}")
+            print("=" * 60 + "\n")
+            return
 
         # 2. Upload to Google Drive
         log("Uploading to Google Drive...")

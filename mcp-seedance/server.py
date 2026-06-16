@@ -469,6 +469,52 @@ async def seedance_generate_video_from_image(
     }, indent=2)
 
 
+@mcp.tool()
+async def seedance_generate_image(
+    prompt: str,
+    model: str = "seedance-2.0",
+    aspect_ratio: str = "16:9",
+) -> str:
+    """
+    Generate an AI image from a text prompt using BytePlus Seedance 2.0.
+    
+    Args:
+        prompt: Detailed description of the image to generate
+        model: Model to use (default: seedance-2.0)
+        aspect_ratio: Aspect ratio: 16:9, 9:16, 1:1, 4:3, etc.
+    
+    Returns:
+        JSON with task_id, status, and image_url when complete
+    """
+    model_id = resolve_model(model)
+    payload = {
+        "model": model_id,
+        "content": [{"type": "text", "text": prompt}],
+        "ratio": aspect_ratio,
+    }
+
+    task = await anyio.to_thread.run_sync(create_task, payload)
+    task_id = task.get("id") or task.get("task_id")
+    
+    result = await poll_task(task_id)
+    image_url = (
+        result.get("content", {}).get("image_url")
+        or result.get("image_url")
+        or result.get("output", {}).get("image_url")
+        # Fallback if the API still returns it in video_url field for some reason
+        or result.get("content", {}).get("video_url")
+        or result.get("video_url")
+    )
+
+    return json.dumps({
+        "task_id": task_id,
+        "status": "succeeded",
+        "image_url": image_url,
+        "model": model_id,
+        "aspect_ratio": aspect_ratio,
+    }, indent=2)
+
+
 # ── Run ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
