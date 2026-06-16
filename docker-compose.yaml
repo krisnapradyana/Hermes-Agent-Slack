@@ -34,7 +34,7 @@ services:
     container_name: seedance-mcp-server
     restart: unless-stopped
     environment:
-      - ARK_API_KEY=${FAL_KEY}
+      - ARK_API_KEY=${ARK_API_KEY}
       - MCP_PORT=8765
     ports:
       - "8765:8765"
