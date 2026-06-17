@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes — Error</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(239, 68, 68, 0.12) 0%, transparent 70%);
+      color: #e8e8f0;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 460px;
+      margin: 2rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 24px;
+      padding: 2.5rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+      text-align: center;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .error-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.1);
+      border: 2px solid rgba(239, 68, 68, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      font-size: 2rem;
+      box-shadow: 0 0 40px rgba(239,68,68,0.15);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.5rem;
+      color: #f0eefc;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 1.5rem;
+    }
+
+    .error-box {
+      background: rgba(239, 68, 68, 0.06);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      font-size: 0.82rem;
+      color: rgba(239, 68, 68, 0.7);
+      line-height: 1.65;
+      text-align: left;
+      margin-bottom: 1.5rem;
+      word-break: break-word;
+    }
+
+    .btn-retry {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.6);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-retry:hover {
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.85);
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="error-icon">⚠️</div>
+
+    <h1>Something Went Wrong</h1>
+    <p class="subtitle">The authorization could not be completed.</p>
+
+    <div class="error-box">{{ message }}</div>
+
+    <a href="/" class="btn-retry">← Try Again</a>
+
+    <p class="footer-note">Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper</p>
+  </div>
+</body>
+</html>

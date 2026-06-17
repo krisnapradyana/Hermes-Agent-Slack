@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes — Connected!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(52, 211, 153, 0.15) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(30, 120, 255, 0.08) 0%, transparent 60%);
+      color: #e8e8f0;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 460px;
+      margin: 2rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+      border-radius: 24px;
+      padding: 2.5rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(52,211,153,0.06) inset;
+      text-align: center;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .checkmark {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(52, 211, 153, 0.12);
+      border: 2px solid rgba(52, 211, 153, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      font-size: 2rem;
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.2s both;
+      box-shadow: 0 0 40px rgba(52,211,153,0.2);
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.5rem;
+      color: #f0eefc;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.6;
+      margin-bottom: 1.8rem;
+    }
+
+    .info-box {
+      background: rgba(52, 211, 153, 0.06);
+      border: 1px solid rgba(52, 211, 153, 0.15);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      font-size: 0.83rem;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.65;
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+
+    .info-box strong { color: rgba(52, 211, 153, 0.85); }
+
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 22px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-back:hover {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7);
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.2);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="checkmark">✅</div>
+
+    <h1>You're Connected!</h1>
+    <p class="subtitle">Google Drive access has been authorized successfully.</p>
+
+    <div class="info-box">
+      <strong>What happens next?</strong><br>
+      The Hermes agent will now automatically use this authorization when your team
+      asks it to upload files or access Google Drive via Slack.
+      <br><br>
+      You <strong>don't need to do this again</strong> unless the token is revoked or you disconnect manually.
+    </div>
+
+    <a href="/" class="btn-back">← Back to status page</a>
+
+    <p class="footer-note">Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper</p>
+  </div>
+</body>
+</html>

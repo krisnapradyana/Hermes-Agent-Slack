@@ -42,3 +42,19 @@ services:
       resources:
         limits:
           memory: 256m
+
+  oauth-helper:
+    build: ./oauth-helper
+    container_name: hermes-oauth-helper
+    restart: unless-stopped
+    ports:
+      - "8643:8643"
+    volumes:
+      - ./documents:/documents
+    environment:
+      - OAUTHLIB_INSECURE_TRANSPORT=1
+      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-hermes-oauth-secret-change-me}
+    deploy:
+      resources:
+        limits:
+          memory: 128m
