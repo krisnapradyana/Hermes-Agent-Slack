@@ -54,6 +54,7 @@ services:
     environment:
       - OAUTHLIB_INSECURE_TRANSPORT=1
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-hermes-oauth-secret-change-me}
+      - OAUTH_PUBLIC_URL=${OAUTH_PUBLIC_URL:-http://localhost:8643}
     deploy:
       resources:
         limits:

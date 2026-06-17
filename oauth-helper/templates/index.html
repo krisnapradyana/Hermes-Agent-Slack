@@ -222,6 +222,49 @@
       background: rgba(239,68,68,0.05);
     }
 
+    .url-box {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .copy-btn {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: rgba(255,255,255,0.45);
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+
+    .remote-note {
+      background: rgba(99,60,255,0.07);
+      border: 1px solid rgba(99,60,255,0.2);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 0.82rem;
+      color: rgba(180,165,255,0.8);
+      line-height: 1.65;
+      margin-bottom: 1.5rem;
+    }
+    .remote-note strong { color: rgba(200,185,255,0.95); }
+
     .footer-note {
       margin-top: 1.5rem;
       font-size: 0.75rem;
@@ -252,6 +295,14 @@
       <h1>Google Account</h1>
       <p class="subtitle">Connect your Google account to let Hermes upload files to Google Drive on your behalf.</p>
 
+      <div class="remote-note">
+        🌐 <strong>For remote users:</strong> This page is accessible at the URL below.
+        Share it with the admin who needs to authorize — they do not need to be on this machine.
+        <div class="url-box">
+          <span id="helper-url">{{ public_url }}</span>
+          <button class="copy-btn" onclick="copyUrl()">Copy</button>
+        </div>
+      </div>
       {% if connected %}
         <div class="status-badge connected">
           <span class="status-dot"></span>
@@ -306,8 +357,18 @@
     {% endif %}
 
     <p class="footer-note">
-      Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper &nbsp;·&nbsp; localhost:8643
+      Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper &nbsp;·&nbsp; {{ public_url }}
     </p>
   </div>
+  <script>
+    function copyUrl() {
+      const url = document.getElementById('helper-url').textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+      });
+    }
+  </script>
 </body>
 </html>

@@ -17,7 +17,12 @@ from google_auth_oauthlib.flow import Flow
 # ── Config ─────────────────────────────────────────────────────────────────────
 CLIENT_SECRETS_FILE = "/documents/google_client_secret.json"
 TOKEN_FILE          = "/documents/token.json"
-REDIRECT_URI        = "http://localhost:8643/oauth/callback"
+
+# Public-facing URL of this helper — must match what's registered in Google Cloud Console.
+# Set OAUTH_PUBLIC_URL in .env to your server's IP/hostname, e.g. http://192.168.1.10:8643
+_public_url  = os.environ.get("OAUTH_PUBLIC_URL", "http://localhost:8643").rstrip("/")
+REDIRECT_URI = f"{_public_url}/oauth/callback"
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
@@ -59,6 +64,7 @@ def index():
         connected=status["connected"],
         reason=status["reason"],
         secrets_missing=secrets_missing,
+        public_url=_public_url,
     )
 
 
@@ -133,6 +139,8 @@ def oauth_disconnect():
 def status():
     """JSON health endpoint for quick checks."""
     s = get_connection_status()
+    s["helper_url"] = _public_url
+    s["redirect_uri"] = REDIRECT_URI
     return s
 
 
