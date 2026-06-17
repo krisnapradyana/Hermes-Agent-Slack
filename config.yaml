@@ -35,7 +35,7 @@ google_drive:
   # URL of the OAuth helper web page — shared with users when Google auth is needed.
   # Update this to your server's IP so remote users can reach it.
   # Example: http://192.168.1.50:8643  or  http://hermes.yourcompany.com:8643
-  oauth_helper_url: "http://localhost:8643"
+  oauth_helper_url: "http://103.49.239.127:8643"
 
 # ── Cleanup Settings ─────────────────────────────────────────────────────────
 # Controls when temporary generated files (videos, documents, etc.) are removed.
