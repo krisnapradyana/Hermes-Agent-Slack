@@ -2,6 +2,7 @@ provider: anthropic
 model:
   default: claude-sonnet-4.6
   auxiliary: claude-haiku-4-5
+  supports_vision: true
 
 display:
   # Suppress mid-turn "thinking" step messages in Slack
