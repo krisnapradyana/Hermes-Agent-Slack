@@ -10,9 +10,9 @@ services:
       - ./.env:/opt/data/custom-.env
       - ./env_sync.py:/opt/data/env_sync.py
       - ./skills:/opt/data/custom-skills
-      - hermes_memory:/opt/data/memories
+      - ./memory:/opt/data/memories
       - ./documents:/documents
-      - ./soul/SOUL.md:/root/.hermes/SOUL.md
+      - ./soul/SOUL.md:/opt/soul/SOUL.md
     env_file:
       - .env
     deploy:
@@ -24,6 +24,8 @@ services:
     command: >
       sh -c "
         mkdir -p $$HOME/.hermes &&
+        chmod -R 777 /opt/data/memories &&
+        ln -sf /opt/soul/SOUL.md $$HOME/.hermes/SOUL.md &&
         ln -sf /documents/google_client_secret.json $$HOME/.hermes/google_client_secret.json &&
         ln -sf /documents/token.json $$HOME/.hermes/google_token.json &&
 
@@ -66,5 +68,3 @@ services:
         limits:
           memory: 128m
 
-volumes:
-  hermes_memory:
