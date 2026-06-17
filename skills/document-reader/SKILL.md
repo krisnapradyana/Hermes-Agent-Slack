@@ -85,7 +85,7 @@ print("Downloaded to:", tmp.name)
 After reading the document, always respond with this structure:
 
 ### 📄 Summary
-2–4 sentences covering what the document is about.
+2–4 sentences covering what the document is about
 
 ### 🔍 Key Findings
 Bullet points of the most important facts, data, or decisions.
