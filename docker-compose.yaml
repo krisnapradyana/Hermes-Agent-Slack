@@ -22,7 +22,11 @@ services:
           memory: 512m
     command: >
       sh -c "
+        mkdir -p $$HOME/.hermes &&
+        ln -sf /documents/google_client_secret.json $$HOME/.hermes/google_client_secret.json &&
+        ln -sf /documents/token.json $$HOME/.hermes/google_token.json &&
         /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
+
         /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py &&
         hermes gateway run
       "
