@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes — Authorize Google</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 60, 255, 0.25) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(30, 120, 255, 0.12) 0%, transparent 60%);
+      color: #e8e8f0;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 500px;
+      margin: 2rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 24px;
+      padding: 2.5rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #7c4dff, #448aff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 18px rgba(124,77,255,0.4);
+    }
+
+    .logo-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #c5b8ff, #82b0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-sub {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.35);
+      font-weight: 400;
+      -webkit-text-fill-color: rgba(255,255,255,0.35);
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.5rem;
+      color: #f0eefc;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.6;
+      margin-bottom: 1.8rem;
+    }
+
+    /* Steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(99,60,255,0.25);
+      border: 1px solid rgba(99,60,255,0.4);
+      color: #c5b8ff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-body {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+    }
+
+    .step-body strong {
+      color: rgba(255,255,255,0.85);
+      display: block;
+      margin-bottom: 2px;
+      font-size: 0.88rem;
+    }
+
+    .step.active {
+      border-color: rgba(99,60,255,0.3);
+      background: rgba(99,60,255,0.06);
+    }
+
+    .step.active .step-num {
+      background: rgba(99,60,255,0.5);
+      border-color: rgba(99,60,255,0.7);
+      color: #fff;
+    }
+
+    .alert-box {
+      background: rgba(251, 191, 36, 0.06);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      font-size: 0.82rem;
+      color: rgba(251, 191, 36, 0.85);
+      line-height: 1.65;
+      margin-bottom: 1.8rem;
+    }
+
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 20px;
+      background: #fff;
+      color: #1f1f1f;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      margin-bottom: 10px;
+    }
+
+    .btn-google:hover {
+      background: #f5f5f5;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(0,0,0,0.4);
+    }
+
+    .google-logo { width: 20px; height: 20px; flex-shrink: 0; }
+
+    .btn-next {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px 20px;
+      background: linear-gradient(135deg, rgba(99,60,255,0.8), rgba(68,138,255,0.8));
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.92rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(99,60,255,0.3);
+    }
+
+    .btn-next:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(99,60,255,0.45);
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+      margin: 1.5rem 0;
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.2);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-row">
+      <div class="logo-icon">🤖</div>
+      <div>
+        <div class="logo-text">Hermes Agent</div>
+        <div class="logo-sub">Google Workspace Setup</div>
+      </div>
+    </div>
+
+    <h1>Step 1 — Sign in with Google</h1>
+    <p class="subtitle">Click the button below to open Google sign-in, then come back here.</p>
+
+    <div class="steps">
+      <div class="step active">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Click "Sign in with Google" below</strong>
+          Your browser opens Google's sign-in page. Authorize the requested permissions.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Your browser shows an error — that's expected</strong>
+          After signing in, Google redirects to <code>http://localhost</code> which won't load.
+          Copy the full URL from your browser's address bar (it contains the authorization code).
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Paste the URL in the next step</strong>
+          Come back here and click "I've authorized →" to paste the URL and complete setup.
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-box">
+      💡 <strong>Why does it redirect to localhost?</strong>
+      Google requires a domain name for web apps, but allows <code>localhost</code> for
+      desktop-type clients. We use this so you don't need to register a domain.
+      The actual token exchange happens securely on this server.
+    </div>
+
+    <a href="{{ auth_url }}" target="_blank" class="btn-google">
+      <svg class="google-logo" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google ↗
+    </a>
+
+    <div class="divider"></div>
+
+    <a href="/oauth/paste" class="btn-next">
+      I've authorized — Paste the URL →
+    </a>
+
+    <p class="footer-note">Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper &nbsp;·&nbsp; {{ public_url }}</p>
+  </div>
+</body>
+</html>

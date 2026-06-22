@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hermes — Paste Authorization URL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 60, 255, 0.25) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(30, 120, 255, 0.12) 0%, transparent 60%);
+      color: #e8e8f0;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      margin: 2rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 24px;
+      padding: 2.5rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #7c4dff, #448aff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 18px rgba(124,77,255,0.4);
+    }
+
+    .logo-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #c5b8ff, #82b0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-sub {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.35);
+      font-weight: 400;
+      -webkit-text-fill-color: rgba(255,255,255,0.35);
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.5rem;
+      color: #f0eefc;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.6;
+      margin-bottom: 1.8rem;
+    }
+
+    .instruction-box {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 1.1rem 1.2rem;
+      margin-bottom: 1.8rem;
+    }
+
+    .instruction-box ol {
+      padding-left: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .instruction-box li {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.6;
+    }
+
+    .instruction-box li strong {
+      color: rgba(255,255,255,0.85);
+    }
+
+    .example-url {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.72rem;
+      color: rgba(99,200,120,0.8);
+      word-break: break-all;
+      margin-top: 0.5rem;
+      line-height: 1.5;
+    }
+
+    /* Form */
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.2px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 0.9rem 1rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: #e8e8f0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      resize: vertical;
+      min-height: 90px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: rgba(99,60,255,0.5);
+      box-shadow: 0 0 0 3px rgba(99,60,255,0.12);
+    }
+
+    textarea::placeholder {
+      color: rgba(255,255,255,0.2);
+    }
+
+    .error-msg {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: rgba(239, 68, 68, 0.07);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      font-size: 0.82rem;
+      color: rgba(239, 68, 68, 0.8);
+      line-height: 1.55;
+      margin-top: 0.75rem;
+    }
+
+    .btn-submit {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 20px;
+      margin-top: 1rem;
+      background: linear-gradient(135deg, rgba(99,60,255,0.85), rgba(68,138,255,0.85));
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 20px rgba(99,60,255,0.3);
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(99,60,255,0.45);
+    }
+
+    .btn-submit:active { transform: translateY(0); }
+
+    .btn-back {
+      display: block;
+      text-align: center;
+      margin-top: 10px;
+      padding: 11px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.35);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-back:hover {
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.6);
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.2);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-row">
+      <div class="logo-icon">🤖</div>
+      <div>
+        <div class="logo-text">Hermes Agent</div>
+        <div class="logo-sub">Google Workspace Setup</div>
+      </div>
+    </div>
+
+    <h1>Step 2 — Paste the Redirect URL</h1>
+    <p class="subtitle">After signing in with Google, your browser was redirected to <code>localhost</code> and showed an error. That's expected — copy the full URL from your address bar and paste it below.</p>
+
+    <div class="instruction-box">
+      <ol>
+        <li>In your browser, look at the <strong>address bar</strong> — even though the page shows an error, the URL should start with <code>http://localhost/?state=...&amp;code=...</code></li>
+        <li><strong>Copy the entire URL</strong> from the address bar (Ctrl+A, then Ctrl+C).</li>
+        <li>Paste it into the box below and click <strong>Complete Authorization</strong>.</li>
+      </ol>
+      <div class="example-url">Example: http://localhost/?state=abc123&amp;code=4/0AVMtM...&amp;scope=...</div>
+    </div>
+
+    <form method="POST" action="/oauth/paste">
+      <label for="redirect_url">Paste the full URL from your browser's address bar:</label>
+      <textarea
+        id="redirect_url"
+        name="redirect_url"
+        placeholder="http://localhost/?state=...&code=...&scope=..."
+        autofocus
+      ></textarea>
+
+      {% if error %}
+        <div class="error-msg">⚠️ {{ error }}</div>
+      {% endif %}
+
+      <button type="submit" class="btn-submit">✓ Complete Authorization</button>
+    </form>
+
+    <a href="/oauth/start" class="btn-back">← Go back and sign in again</a>
+
+    <p class="footer-note">Hermes Agent &nbsp;·&nbsp; Google OAuth2 Helper &nbsp;·&nbsp; {{ public_url }}</p>
+  </div>
+</body>
+</html>

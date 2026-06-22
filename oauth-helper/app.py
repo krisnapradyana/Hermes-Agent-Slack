@@ -1,54 +1,64 @@
 """
 app.py — Google OAuth2 Web Helper for Hermes Agent
 
-Serves a simple web UI at http://localhost:8643 so a non-technical admin
-can authorize Google Drive access with one click. Saves token.json to the
-shared /documents volume which the hermes container also mounts.
+Serves a simple web UI at http://<server>:8643 so a non-technical admin
+can authorize Google Drive access in two clicks — no domain name required.
+
+Flow (works for any remote user without a public domain):
+  1. User clicks "Connect Google Account" → Flask generates a Google auth URL
+     with redirect_uri=http://localhost (allowed for "Desktop app" client type).
+  2. User's browser is redirected to Google sign-in.
+  3. After sign-in, Google redirects to http://localhost/?code=...&state=...
+     This fails in the browser (nothing on localhost:80), but the URL bar
+     shows the full URL with the authorization code.
+  4. The UI shows a paste box. User copies that URL from address bar, pastes it.
+  5. Flask extracts code+state, exchanges server-side → saves token.json.
 """
 
-import json
 import os
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 
-# ── Config ─────────────────────────────────────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────────────────────
 CLIENT_SECRETS_FILE = "/documents/google_client_secret.json"
 TOKEN_FILE          = "/documents/token.json"
 
-# Public-facing base URL of this OAuth helper (e.g. http://103.49.239.127:8643).
-# MUST match the redirect URI registered in Google Cloud Console.
-# Falls back to request host if not set (only works for local access).
-PUBLIC_URL = os.environ.get("OAUTH_PUBLIC_URL", "").rstrip("/")
+# The redirect_uri we tell Google to send the user to after sign-in.
+# We use http://localhost because Google ALWAYS allows it for "Desktop app"
+# (installed) client types — no domain registration needed.
+# After the redirect fails in the browser, the user copies the URL and pastes
+# it into the helper UI (Step 4 above), where we process it server-side.
+LOOPBACK_REDIRECT_URI = "http://localhost"
 
 SCOPES = [
+    # Google Drive
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
+    # Google Docs
+    "https://www.googleapis.com/auth/documents",
+    # Google Slides
+    "https://www.googleapis.com/auth/presentations",
+    # Google Sheets
+    "https://www.googleapis.com/auth/spreadsheets",
+    # Google Calendar
+    "https://www.googleapis.com/auth/calendar",
 ]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "hermes-oauth-helper-default-secret")
 
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-def get_redirect_uri() -> str:
-    """Return the OAuth callback URL using OAUTH_PUBLIC_URL if configured.
-
-    Using url_for(_external=True) is unreliable for remote users because Flask
-    sees the internal/container hostname, not the public IP. OAUTH_PUBLIC_URL
-    must match exactly what is registered in Google Cloud Console.
-    """
-    if PUBLIC_URL:
-        return f"{PUBLIC_URL}/oauth/callback"
-    # Fallback — only works when accessed from the same machine as the server
-    return url_for("oauth_callback", _external=True)
+# Public-facing URL of this helper — used only for display purposes.
+PUBLIC_URL = os.environ.get("OAUTH_PUBLIC_URL", "").rstrip("/")
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def get_connection_status() -> dict:
-    """Check if token.json exists and is still valid (not expired)."""
+    """Check if token.json exists and is still valid (or refreshable)."""
     if not os.path.exists(TOKEN_FILE):
         return {"connected": False, "email": None, "reason": "No token found"}
 
@@ -58,7 +68,6 @@ def get_connection_status() -> dict:
             return {"connected": True, "email": None, "reason": None}
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            # Save refreshed token
             with open(TOKEN_FILE, "w") as f:
                 f.write(creds.to_json())
             return {"connected": True, "email": None, "reason": None}
@@ -67,23 +76,34 @@ def get_connection_status() -> dict:
         return {"connected": False, "email": None, "reason": str(e)}
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+def display_url() -> str:
+    """Best-effort public URL for display in templates."""
+    return PUBLIC_URL or request.host_url.rstrip("/")
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     status = get_connection_status()
     secrets_missing = not os.path.exists(CLIENT_SECRETS_FILE)
-    public_url = request.host_url.rstrip('/')
     return render_template(
         "index.html",
         connected=status["connected"],
         reason=status["reason"],
         secrets_missing=secrets_missing,
-        public_url=public_url,
+        public_url=display_url(),
     )
 
 
 @app.route("/oauth/start")
 def oauth_start():
+    """Generate Google auth URL and redirect the user to it.
+
+    We pass redirect_uri=http://localhost — Google allows this for Desktop/installed
+    app clients without any domain registration. After the user authorizes,
+    Google redirects to http://localhost/?code=...  which fails in the browser.
+    The UI then asks the user to copy & paste that URL back.
+    """
     if not os.path.exists(CLIENT_SECRETS_FILE):
         return render_template(
             "error.html",
@@ -91,72 +111,99 @@ def oauth_start():
                     "Please make sure the file is mounted correctly.",
         )
 
-    redirect_uri = get_redirect_uri()
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri=redirect_uri,
+        redirect_uri=LOOPBACK_REDIRECT_URI,
     )
     auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="consent",          # Forces refresh_token to always be returned
+        prompt="consent",  # Always return refresh_token
     )
     session["oauth_state"] = state
-    session["redirect_uri"] = redirect_uri  # store so callback uses the same value
-    return redirect(auth_url)
+    return render_template("authorize.html", auth_url=auth_url, public_url=display_url())
 
 
-@app.route("/oauth/callback")
-def oauth_callback():
-    # Error returned by Google (e.g. user cancelled)
-    if "error" in request.args:
-        error = request.args.get("error", "Unknown error")
-        return render_template("error.html", message=f"Google returned an error: {error}")
+@app.route("/oauth/paste", methods=["GET", "POST"])
+def oauth_paste():
+    """Show (GET) or process (POST) the paste-URL form.
 
-    state = session.get("oauth_state")
-    if not state:
+    The user pastes the full http://localhost/?code=...&state=... URL that
+    appeared in their browser after Google redirected them. We extract the
+    code and state parameters and exchange them for tokens server-side.
+    """
+    if request.method == "GET":
+        return render_template("paste.html", public_url=display_url())
+
+    pasted = request.form.get("redirect_url", "").strip()
+    if not pasted:
+        return render_template(
+            "paste.html",
+            public_url=display_url(),
+            error="Please paste the URL from your browser's address bar.",
+        )
+
+    # Parse query parameters from the pasted URL
+    try:
+        parsed = urlparse(pasted)
+        params = parse_qs(parsed.query)
+    except Exception:
+        return render_template(
+            "paste.html",
+            public_url=display_url(),
+            error="That doesn't look like a valid URL. Please copy the full address bar URL.",
+        )
+
+    # Check for Google error (e.g. user clicked "Deny")
+    if "error" in params:
         return render_template(
             "error.html",
-            message="Session state missing. Please try connecting again — "
-                    "this can happen if cookies are blocked or the session expired.",
+            message=f"Google returned an error: {params['error'][0]}",
+        )
+
+    code = params.get("code", [None])[0]
+    state = params.get("state", [None])[0]
+
+    if not code:
+        return render_template(
+            "paste.html",
+            public_url=display_url(),
+            error="No authorization code found in that URL. Make sure you copied the full address bar URL after signing in with Google.",
+        )
+
+    # Validate state to prevent CSRF — but be lenient if the session expired
+    stored_state = session.get("oauth_state")
+    if stored_state and state and stored_state != state:
+        return render_template(
+            "error.html",
+            message="State mismatch — the URL may be stale or tampered with. Please start over.",
         )
 
     try:
-        # Use the same redirect_uri that was used in oauth_start.
-        # IMPORTANT: fetch_token validates that the redirect_uri matches exactly
-        # what Google received. We must NOT use request.url here because Flask
-        # may see http://localhost/... while Google sent the user to the public IP.
-        redirect_uri = session.pop("redirect_uri", get_redirect_uri())
-
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
-            state=state,
-            redirect_uri=redirect_uri,
+            state=state or stored_state,
+            redirect_uri=LOOPBACK_REDIRECT_URI,
         )
 
-        # Reconstruct the full callback URL using the public base so it matches
-        # the redirect_uri registered in Google Cloud Console.
-        # request.url may contain the container-internal host/IP instead of the
-        # public-facing one, which would cause a redirect_uri_mismatch error.
-        if PUBLIC_URL:
-            # Replace scheme+host with the public URL, keep query string intact
-            from urllib.parse import urlparse, urlunparse
-            parsed = urlparse(request.url)
-            pub = urlparse(PUBLIC_URL)
-            auth_response = urlunparse((
-                pub.scheme, pub.netloc,
-                parsed.path, parsed.params,
-                parsed.query, parsed.fragment,
-            ))
-        else:
-            auth_response = request.url
+        # Reconstruct a clean authorization_response URL that fetch_token can parse.
+        # We only need the path + query from the pasted URL; scheme and host must
+        # match LOOPBACK_REDIRECT_URI exactly.
+        loopback_parsed = urlparse(LOOPBACK_REDIRECT_URI)
+        auth_response = urlunparse((
+            loopback_parsed.scheme,
+            loopback_parsed.netloc,
+            parsed.path or "/",
+            "",
+            parsed.query,
+            "",
+        ))
 
         flow.fetch_token(authorization_response=auth_response)
         credentials = flow.credentials
 
-        # Persist token to shared volume
         with open(TOKEN_FILE, "w") as f:
             f.write(credentials.to_json())
 
@@ -179,8 +226,8 @@ def oauth_disconnect():
 def status():
     """JSON health endpoint for quick checks."""
     s = get_connection_status()
-    s["helper_url"] = PUBLIC_URL or request.host_url.rstrip("/")
-    s["redirect_uri"] = get_redirect_uri()
+    s["helper_url"] = display_url()
+    s["redirect_uri"] = LOOPBACK_REDIRECT_URI
     return s
 
 

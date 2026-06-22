@@ -15,9 +15,18 @@ from google.oauth2.credentials import Credentials
 
 TOKEN_FILE = "/documents/token.json"
 SCOPES = [
+    # Google Drive
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
+    # Google Docs
+    "https://www.googleapis.com/auth/documents",
+    # Google Slides
+    "https://www.googleapis.com/auth/presentations",
+    # Google Sheets
+    "https://www.googleapis.com/auth/spreadsheets",
+    # Google Calendar
+    "https://www.googleapis.com/auth/calendar",
 ]
 
 REFRESH_INTERVAL_SECONDS = 12 * 60 * 60  # 12 hours
