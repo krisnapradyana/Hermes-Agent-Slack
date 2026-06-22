@@ -31,6 +31,8 @@ services:
         mkdir -p /documents/user_tokens &&
         ln -sfn /documents/user_tokens $$HOME/.hermes/user_tokens &&
 
+        /opt/hermes/.venv/bin/pip install --quiet --disable-pip-version-check slack-sdk &&
+
         /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
 
         /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py &&
