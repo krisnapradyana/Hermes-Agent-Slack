@@ -2,15 +2,26 @@
 fetch_history.py — Slack channel history fetcher for Hermes
 ============================================================
 Zero external dependencies. Uses curl (always available in the container)
-via subprocess. Fetches root messages + all thread replies.
+via subprocess. Fetches root messages + all thread replies, with optional
+date range filtering.
 
 Usage:
-    python3 fetch_history.py <CHANNEL_ID> [--limit N]
+    python3 fetch_history.py <CHANNEL_ID> [--limit N] [--since DATE] [--until DATE]
 
 Arguments:
-    CHANNEL_ID   Slack channel ID (e.g. C0B9YPS8HDZ)
-    --limit N    Number of root messages to fetch (default: 250)
-                 Thread replies are always fetched in full.
+    CHANNEL_ID      Slack channel ID (e.g. C0B9YPS8HDZ)
+    --limit N       Max root messages to fetch (default: 250; ignored when date range is set)
+    --since DATE    Fetch messages on or after this date/datetime (UTC)
+    --until DATE    Fetch messages on or before this date/datetime (UTC)
+
+Date formats accepted for --since / --until:
+    YYYY-MM-DD                e.g. 2024-12-01
+    YYYY-MM-DDTHH:MM:SS       e.g. 2024-12-01T09:00:00
+    YYYY-MM-DD HH:MM:SS       e.g. 2024-12-01 09:00:00
+
+    Dates without a time component default to:
+        --since  → start of day (00:00:00 UTC)
+        --until  → end of day   (23:59:59 UTC)
 
 Token resolution order:
     1. SLACK_BOT_TOKEN environment variable (preferred)
@@ -27,7 +38,7 @@ import json
 import os
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +57,7 @@ def get_token() -> str:
             for line in f:
                 line = line.strip()
                 if line.startswith("SLACK_BOT_TOKEN="):
-                    token = line.split("=", 1)[1].strip()
+                    token = line.split("=", 1)[1].strip().strip('"').strip("'")
                     if token:
                         return token
     except FileNotFoundError:
@@ -60,7 +71,51 @@ def get_token() -> str:
 
 
 # ---------------------------------------------------------------------------
-# curl Helpers
+# Date Parsing
+# ---------------------------------------------------------------------------
+
+_DATE_FORMATS = [
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d",
+]
+
+
+def parse_date(value: str, end_of_day: bool = False) -> float:
+    """
+    Parse a date/datetime string into a UTC Unix timestamp.
+
+    Args:
+        value:      Date string (see module docstring for accepted formats).
+        end_of_day: If True and no time component is present, use 23:59:59
+                    instead of 00:00:00. Used for --until dates.
+
+    Returns:
+        UTC Unix timestamp as a float.
+    """
+    for fmt in _DATE_FORMATS:
+        try:
+            dt = datetime.strptime(value, fmt)
+            # If the format has no time component and end_of_day is requested,
+            # push to 23:59:59 of that day.
+            if fmt == "%Y-%m-%d" and end_of_day:
+                dt = dt.replace(hour=23, minute=59, second=59)
+            # Treat as UTC
+            dt = dt.replace(tzinfo=timezone.utc)
+            return dt.timestamp()
+        except ValueError:
+            continue
+
+    print(
+        f"Error: Cannot parse date '{value}'.\n"
+        "Accepted formats: YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS, YYYY-MM-DD HH:MM:SS",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# curl Helper
 # ---------------------------------------------------------------------------
 
 def slack_get(url: str, token: str) -> dict:
@@ -90,53 +145,34 @@ def slack_get(url: str, token: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def build_user_map(messages: list[dict], token: str) -> dict[str, str]:
-    """Fetch display names for all unique user IDs found in messages."""
+    """Fetch display names for all unique user IDs found in a list of messages."""
     user_ids: set[str] = set()
     for m in messages:
         if "user" in m:
             user_ids.add(m["user"])
-        # Also collect user IDs from thread reply previews
-        for reply_user in [r.get("user") for r in m.get("replies", []) if r.get("user")]:
-            user_ids.add(reply_user)
+        for r in m.get("replies", []):
+            if r.get("user"):
+                user_ids.add(r["user"])
 
     user_map: dict[str, str] = {}
     for uid in user_ids:
         data = slack_get(f"https://slack.com/api/users.info?user={uid}", token)
         if data.get("ok"):
-            user = data["user"]
+            profile = data["user"].get("profile", {})
             name = (
-                user.get("profile", {}).get("display_name")
-                or user.get("real_name")
-                or user.get("name")
+                profile.get("display_name")
+                or data["user"].get("real_name")
+                or data["user"].get("name")
                 or uid
             )
             user_map[uid] = name
         else:
-            user_map[uid] = uid  # Graceful fallback
-
+            user_map[uid] = uid
     return user_map
 
 
 # ---------------------------------------------------------------------------
-# Text Cleanup
-# ---------------------------------------------------------------------------
-
-def resolve_mentions(text: str, user_map: dict[str, str]) -> str:
-    """Replace <@UXXXXXXX> Slack mention tokens with @DisplayName."""
-    for uid, name in user_map.items():
-        text = text.replace(f"<@{uid}>", f"@{name}")
-    return text
-
-
-def format_timestamp(ts: str) -> str:
-    try:
-        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
-    except (ValueError, TypeError):
-        return ts
-
-
-# ---------------------------------------------------------------------------
-# Thread Reply Fetcher
+# Text Helpers
 # ---------------------------------------------------------------------------
 
 _SKIP_SUBTYPES = {
@@ -145,6 +181,26 @@ _SKIP_SUBTYPES = {
 }
 
 
+def resolve_mentions(text: str, user_map: dict[str, str]) -> str:
+    """Replace <@UXXXXXXX> Slack mention tokens with @DisplayName."""
+    for uid, name in user_map.items():
+        text = text.replace(f"<@{uid}>", f"@{name}")
+    return text
+
+
+def format_ts(ts: str) -> str:
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
+    except (ValueError, TypeError):
+        return ts
+
+
+# ---------------------------------------------------------------------------
+# Thread Reply Fetcher
+# ---------------------------------------------------------------------------
+
 def fetch_thread_replies(
     channel_id: str,
     thread_ts: str,
@@ -152,9 +208,8 @@ def fetch_thread_replies(
     user_map: dict[str, str],
 ) -> list[str]:
     """
-    Fetch all replies for a thread via conversations.replies.
-    The first item is the root message itself — skip it to avoid duplication.
-    Returns formatted, indented lines.
+    Fetch all replies for a thread. Skips the first item (root message duplicate).
+    Returns indented, formatted lines.
     """
     lines: list[str] = []
     url = (
@@ -168,17 +223,14 @@ def fetch_thread_replies(
         return lines
 
     replies = data.get("messages", [])
-
-    # Handle pagination for very long threads
     while data.get("has_more"):
-        next_cursor = data.get("response_metadata", {}).get("next_cursor", "")
-        if not next_cursor:
+        cursor = data.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
             break
-        data = slack_get(url + f"&cursor={next_cursor}", token)
+        data = slack_get(url + f"&cursor={cursor}", token)
         replies.extend(data.get("messages", []))
 
-    # Skip index 0 — it is the root message (already printed)
-    for reply in replies[1:]:
+    for reply in replies[1:]:  # Skip index 0 — it is the root message
         subtype = reply.get("subtype", "")
         text = reply.get("text", "").strip()
         if not text or subtype in _SKIP_SUBTYPES:
@@ -186,12 +238,9 @@ def fetch_thread_replies(
 
         uid = reply.get("user") or reply.get("bot_id", "")
         author = user_map.get(uid, uid or "Bot")
-        ts_str = format_timestamp(reply.get("ts", ""))
         text = resolve_mentions(text, user_map)
+        lines.append(f"    ↳ [{format_ts(reply.get('ts', ''))}] {author}: {text}")
 
-        lines.append(f"    ↳ [{ts_str}] {author}: {text}")
-
-        # Files in thread replies
         for f in reply.get("files", []):
             lines.append(f"      [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
 
@@ -199,23 +248,42 @@ def fetch_thread_replies(
 
 
 # ---------------------------------------------------------------------------
-# Main Fetcher
+# Root Message Fetcher
 # ---------------------------------------------------------------------------
 
-def fetch_history(channel_id: str, limit: int = 250) -> None:
-    token = get_token()
-
-    # --- Fetch root messages ---
-    all_messages: list[dict] = []
-    remaining = limit
+def fetch_root_messages(
+    channel_id: str,
+    token: str,
+    limit: int,
+    oldest_ts: float | None,
+    latest_ts: float | None,
+) -> list[dict]:
+    """
+    Fetch root messages from conversations.history with optional date range.
+    Paginates automatically until `limit` is reached or no more pages exist.
+    """
+    messages: list[dict] = []
     cursor_param = ""
+    # When a date range is set, remove the hard cap so we get everything in range.
+    # Use a large sentinel instead to keep the loop simple.
+    effective_limit = limit if (oldest_ts is None and latest_ts is None) else 10_000
+
+    remaining = effective_limit
 
     while remaining > 0:
         batch_size = min(remaining, 1000)
-        url = (
-            f"https://slack.com/api/conversations.history"
-            f"?channel={channel_id}&limit={batch_size}{cursor_param}"
-        )
+        params = [f"channel={channel_id}", f"limit={batch_size}"]
+
+        if oldest_ts is not None:
+            params.append(f"oldest={oldest_ts}")
+        if latest_ts is not None:
+            params.append(f"latest={latest_ts}")
+        if cursor_param:
+            params.append(f"cursor={cursor_param}")
+        # inclusive=true so boundary timestamps are included
+        params.append("inclusive=true")
+
+        url = "https://slack.com/api/conversations.history?" + "&".join(params)
         data = slack_get(url, token)
 
         if not data.get("ok"):
@@ -231,25 +299,48 @@ def fetch_history(channel_id: str, limit: int = 250) -> None:
             sys.exit(1)
 
         batch = data.get("messages", [])
-        all_messages.extend(batch)
+        messages.extend(batch)
         remaining -= len(batch)
 
         next_cursor = data.get("response_metadata", {}).get("next_cursor", "")
         if not next_cursor or len(batch) < batch_size:
             break
-        cursor_param = f"&cursor={next_cursor}"
+        cursor_param = next_cursor
+
+    return messages
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def fetch_history(
+    channel_id: str,
+    limit: int = 250,
+    oldest_ts: float | None = None,
+    latest_ts: float | None = None,
+) -> None:
+    token = get_token()
+
+    # --- Describe what we're fetching ---
+    if oldest_ts or latest_ts:
+        since_str = datetime.fromtimestamp(oldest_ts, tz=timezone.utc).strftime("%Y-%m-%d") if oldest_ts else "beginning"
+        until_str = datetime.fromtimestamp(latest_ts, tz=timezone.utc).strftime("%Y-%m-%d") if latest_ts else "now"
+        print(f"Fetching messages from {since_str} → {until_str}...", file=sys.stderr)
+    else:
+        print(f"Fetching last {limit} root messages...", file=sys.stderr)
+
+    # --- Fetch root messages ---
+    all_messages = fetch_root_messages(channel_id, token, limit, oldest_ts, latest_ts)
 
     if not all_messages:
-        print("No messages found in this channel.")
+        print("No messages found for the given channel / date range.")
         return
 
     print(f"Got {len(all_messages)} root messages. Resolving users...", file=sys.stderr)
-
-    # --- Build user map ---
     user_map = build_user_map(all_messages, token)
 
-    # --- Build chronological transcript ---
-    # conversations.history returns newest-first → reverse for chronological order
+    # Build chronological transcript (API returns newest-first)
     output_lines: list[str] = []
     thread_count = 0
     reply_count = 0
@@ -257,32 +348,22 @@ def fetch_history(channel_id: str, limit: int = 250) -> None:
     for msg in reversed(all_messages):
         subtype = msg.get("subtype", "")
         text = msg.get("text", "").strip()
-
         if not text or subtype in _SKIP_SUBTYPES:
             continue
 
         uid = msg.get("user") or msg.get("bot_id", "")
         author = user_map.get(uid, uid or "Bot")
-        ts_str = format_timestamp(msg.get("ts", ""))
         text = resolve_mentions(text, user_map)
+        output_lines.append(f"[{format_ts(msg.get('ts', ''))}] {author}: {text}")
 
-        output_lines.append(f"[{ts_str}] {author}: {text}")
-
-        # Files attached to root message
         for f in msg.get("files", []):
-            output_lines.append(
-                f"  [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]"
-            )
-
-        # Attachments (link previews, etc.)
+            output_lines.append(f"  [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
         for a in msg.get("attachments", []):
             title = a.get("title") or a.get("text", "")[:60] or "attachment"
             output_lines.append(f"  [Attachment: {title}]")
 
-        # Thread replies
         if msg.get("reply_count", 0) > 0:
-            thread_ts = msg.get("ts", "")
-            thread_lines = fetch_thread_replies(channel_id, thread_ts, token, user_map)
+            thread_lines = fetch_thread_replies(channel_id, msg["ts"], token, user_map)
             if thread_lines:
                 output_lines.extend(thread_lines)
                 thread_count += 1
@@ -304,9 +385,27 @@ def fetch_history(channel_id: str, limit: int = 250) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch Slack channel history (including thread replies) "
-            "and print a clean transcript. Zero external dependencies."
-        )
+            "Fetch Slack channel history (with thread replies) and print a clean transcript.\n"
+            "Supports optional date range filtering via --since / --until."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Last 250 messages (default):
+    python3 fetch_history.py C0B9YPS8HDZ
+
+  Last 500 root messages:
+    python3 fetch_history.py C0B9YPS8HDZ --limit 500
+
+  Messages from a specific date onwards:
+    python3 fetch_history.py C0B9YPS8HDZ --since 2025-01-01
+
+  Messages within a date range:
+    python3 fetch_history.py C0B9YPS8HDZ --since 2024-12-01 --until 2025-02-28
+
+  Messages on a single day:
+    python3 fetch_history.py C0B9YPS8HDZ --since 2025-06-01 --until 2025-06-01
+        """,
     )
     parser.add_argument("channel_id", help="Slack channel ID (e.g. C0B9YPS8HDZ)")
     parser.add_argument(
@@ -314,14 +413,30 @@ def main() -> None:
         type=int,
         default=250,
         metavar="N",
-        help="Number of root messages to fetch (default: 250). Thread replies always fetched in full.",
+        help="Max root messages to fetch when no date range is set (default: 250).",
+    )
+    parser.add_argument(
+        "--since",
+        metavar="DATE",
+        help="Fetch messages on or after this date (UTC). Format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS",
+    )
+    parser.add_argument(
+        "--until",
+        metavar="DATE",
+        help="Fetch messages on or before this date (UTC). Format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS",
     )
     args = parser.parse_args()
 
     if args.limit < 1:
         parser.error("--limit must be a positive integer")
 
-    fetch_history(args.channel_id, args.limit)
+    oldest_ts = parse_date(args.since, end_of_day=False) if args.since else None
+    latest_ts = parse_date(args.until, end_of_day=True) if args.until else None
+
+    if oldest_ts and latest_ts and oldest_ts > latest_ts:
+        parser.error("--since date must be earlier than --until date")
+
+    fetch_history(args.channel_id, args.limit, oldest_ts, latest_ts)
 
 
 if __name__ == "__main__":

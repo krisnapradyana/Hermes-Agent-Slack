@@ -1,11 +1,11 @@
 ---
 name: channel-summarizer
-description: "Read all chat history in the current channel and summarize it, even if Hermes joined late."
-version: 2.1.0
+description: "Read all chat history in the current channel and summarize it, with optional date range filtering."
+version: 3.0.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [summarize, channel, history, catch up, chat history, read channel]
+    tags: [summarize, channel, history, catch up, chat history, read channel, date range, since, recap]
     related_skills: []
 ---
 
@@ -39,34 +39,90 @@ metadata:
 
 Script path: `/opt/data/custom-skills/channel-summarizer/fetch_history.py`
 
-### Usage
+---
 
-```bash
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --limit 250
-```
-
-- Replace `<CHANNEL_ID>` with the actual Slack channel ID from the current message context.
-- Increase `--limit` up to 500 for very busy channels, or as the user requests.
-
-### Flags
+## Flags Reference
 
 | Flag | Default | Description |
 |---|---|---|
-| `--limit N` | `250` | Number of messages to fetch. Values > 1000 trigger automatic pagination. |
+| `--limit N` | `250` | Max root messages when no date range is set |
+| `--since DATE` | *(none)* | Fetch messages on or after this date (UTC) |
+| `--until DATE` | *(none)* | Fetch messages on or before this date (UTC) |
+
+**Accepted date formats:**
+- `YYYY-MM-DD` → e.g. `2024-12-01`
+- `YYYY-MM-DDTHH:MM:SS` → e.g. `2024-12-01T09:00:00`
+
+> When `--since` or `--until` is set, `--limit` is ignored and **all messages** in the date range are fetched automatically.
 
 ---
 
 ## Instructions for Hermes
 
-1. Extract the channel ID from the current Slack message context.
-2. Run the script using `run_command` with the channel ID and `--limit 250`.
-3. Read the chronological transcript from the output (format: `[timestamp] DisplayName: message`).
-4. Provide a structured summary covering:
-   - The general topic or context
-   - Key decisions made
-   - Outstanding action items
-   - Important files or links shared
-   - The approximate time span covered
+### Case 1 — Recent history (no date specified)
+
+```bash
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --limit 250
+```
+
+Use when the user says: *"summarize the chat"*, *"catch me up"*, *"what did I miss?"*
+
+---
+
+### Case 2 — From a specific date onwards
+
+```bash
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD
+```
+
+Use when the user says: *"summarize since January 1st"*, *"what happened after the launch?"*
+
+---
+
+### Case 3 — Up to a specific date
+
+```bash
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --until YYYY-MM-DD
+```
+
+---
+
+### Case 4 — Date range (most common for historical queries)
+
+```bash
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD --until YYYY-MM-DD
+```
+
+Use when the user says: *"summarize last December"*, *"what happened in Q1 2025?"*, *"recap messages from winter"*
+
+**Examples:**
+```bash
+# Last 250 messages (default)
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ
+
+# All of December 2024
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2024-12-01 --until 2024-12-31
+
+# Q1 2025 (Jan–Mar)
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-01-01 --until 2025-03-31
+
+# Single day
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-22 --until 2025-06-22
+
+# From a date to now (no --until)
+python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-01
+```
+
+---
+
+### After running the script
+
+Read the chronological transcript (format: `[YYYY-MM-DD HH:MM:SS UTC] DisplayName: message`) and provide a structured summary covering:
+- The general topic or context
+- Key decisions made
+- Outstanding action items
+- Important files or links shared
+- The time span covered
 
 ---
 
@@ -75,10 +131,12 @@ python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID>
 Activate when the user says:
 - "summarize the chat"
 - "summarize this channel"
-- "read channel history"
-- "catch me up"
-- "catch up on this channel"
-- "what happened before you joined?"
+- "catch me up" / "catch up on this channel"
 - "what did I miss?"
+- "read channel history"
 - "recap this channel"
-- "explain the channel history"
+- "what happened before you joined?"
+- "summarize last [month/week/period]" → use `--since` / `--until`
+- "what happened in [month/quarter/year]?" → use `--since` / `--until`
+- "summarize messages from [date] to [date]" → use `--since` / `--until`
+- "what was discussed during [period]?" → use `--since` / `--until`
