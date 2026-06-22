@@ -33,6 +33,9 @@ USER_TOKEN_DIR      = "/documents/user_tokens"          # per-user tokens
 
 LOOPBACK_REDIRECT_URI = "http://localhost"
 
+# Relax token scope matching to allow Google to return different (e.g. more) scopes
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
@@ -41,6 +44,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 PUBLIC_URL = os.environ.get("OAUTH_PUBLIC_URL", "").rstrip("/")

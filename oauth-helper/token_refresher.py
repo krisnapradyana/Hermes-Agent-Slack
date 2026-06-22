@@ -25,6 +25,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 REFRESH_INTERVAL_SECONDS = 12 * 60 * 60  # 12 hours
