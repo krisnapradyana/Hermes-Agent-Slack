@@ -1,9 +1,8 @@
 """
 fetch_history.py — Slack channel history fetcher for Hermes
 ============================================================
-Fetches the last N root messages from a Slack channel, then fetches all
-thread replies for any message that has them. Prints a clean, chronological
-transcript to stdout — root messages followed by indented thread replies.
+Zero external dependencies. Uses curl (always available in the container)
+via subprocess. Fetches root messages + all thread replies.
 
 Usage:
     python3 fetch_history.py <CHANNEL_ID> [--limit N]
@@ -11,220 +10,288 @@ Usage:
 Arguments:
     CHANNEL_ID   Slack channel ID (e.g. C0B9YPS8HDZ)
     --limit N    Number of root messages to fetch (default: 250)
-                 Thread replies are always fetched in full regardless of this limit.
+                 Thread replies are always fetched in full.
 
-Environment:
-    SLACK_BOT_TOKEN   Required. Bot token with channels:history + users:read scopes.
+Token resolution order:
+    1. SLACK_BOT_TOKEN environment variable (preferred)
+    2. /opt/data/custom-.env file (fallback for container env)
 
-Required Scopes:
+Required Slack scopes:
     channels:history  (or groups:history for private channels)
     channels:read
     users:read
 """
 
+import subprocess
+import json
 import os
 import sys
 import argparse
 from datetime import datetime
 
-try:
-    from slack_sdk import WebClient
-    from slack_sdk.errors import SlackApiError
-except ImportError:
+
+# ---------------------------------------------------------------------------
+# Token Resolution
+# ---------------------------------------------------------------------------
+
+def get_token() -> str:
+    """Read SLACK_BOT_TOKEN from env var first, then fall back to .env file."""
+    token = os.environ.get("SLACK_BOT_TOKEN", "").strip()
+    if token:
+        return token
+
+    env_file = "/opt/data/custom-.env"
+    try:
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("SLACK_BOT_TOKEN="):
+                    token = line.split("=", 1)[1].strip()
+                    if token:
+                        return token
+    except FileNotFoundError:
+        pass
+
     print(
-        "Error: slack-sdk is not installed.\n"
-        "Run: pip install slack-sdk",
+        "Error: SLACK_BOT_TOKEN not found in environment or /opt/data/custom-.env",
         file=sys.stderr,
     )
     sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
-# User ID → Display Name Cache
+# curl Helpers
 # ---------------------------------------------------------------------------
 
-_user_cache: dict[str, str] = {}
-
-
-def resolve_user(client: WebClient, user_id: str) -> str:
-    """Return the display name for a Slack user ID, falling back to the ID."""
-    if not user_id:
-        return "Unknown"
-
-    if user_id in _user_cache:
-        return _user_cache[user_id]
-
-    # Bot IDs start with 'B' — skip API call
-    if user_id.startswith("B"):
-        _user_cache[user_id] = f"Bot({user_id})"
-        return _user_cache[user_id]
-
+def slack_get(url: str, token: str) -> dict:
+    """Make a GET request to the Slack API via curl and return parsed JSON."""
+    result = subprocess.run(
+        [
+            "curl", "-s",
+            url,
+            "-H", f"Authorization: Bearer {token}",
+            "-H", "Content-Type: application/json",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"curl error: {result.stderr}", file=sys.stderr)
+        sys.exit(1)
     try:
-        resp = client.users_info(user=user_id)
-        profile = resp["user"]["profile"]
-        name = (
-            profile.get("display_name")
-            or profile.get("real_name")
-            or user_id
-        )
-        _user_cache[user_id] = name
-    except SlackApiError:
-        _user_cache[user_id] = user_id  # Graceful fallback
-
-    return _user_cache[user_id]
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse Slack response: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# User Resolution
 # ---------------------------------------------------------------------------
 
-# Subtypes to skip — system events with no useful content
+def build_user_map(messages: list[dict], token: str) -> dict[str, str]:
+    """Fetch display names for all unique user IDs found in messages."""
+    user_ids: set[str] = set()
+    for m in messages:
+        if "user" in m:
+            user_ids.add(m["user"])
+        # Also collect user IDs from thread reply previews
+        for reply_user in [r.get("user") for r in m.get("replies", []) if r.get("user")]:
+            user_ids.add(reply_user)
+
+    user_map: dict[str, str] = {}
+    for uid in user_ids:
+        data = slack_get(f"https://slack.com/api/users.info?user={uid}", token)
+        if data.get("ok"):
+            user = data["user"]
+            name = (
+                user.get("profile", {}).get("display_name")
+                or user.get("real_name")
+                or user.get("name")
+                or uid
+            )
+            user_map[uid] = name
+        else:
+            user_map[uid] = uid  # Graceful fallback
+
+    return user_map
+
+
+# ---------------------------------------------------------------------------
+# Text Cleanup
+# ---------------------------------------------------------------------------
+
+def resolve_mentions(text: str, user_map: dict[str, str]) -> str:
+    """Replace <@UXXXXXXX> Slack mention tokens with @DisplayName."""
+    for uid, name in user_map.items():
+        text = text.replace(f"<@{uid}>", f"@{name}")
+    return text
+
+
+def format_timestamp(ts: str) -> str:
+    try:
+        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return ts
+
+
+# ---------------------------------------------------------------------------
+# Thread Reply Fetcher
+# ---------------------------------------------------------------------------
+
 _SKIP_SUBTYPES = {
     "channel_join", "channel_leave", "channel_purpose",
     "channel_topic", "channel_archive", "channel_unarchive",
 }
 
 
-def format_message(client: WebClient, msg: dict, prefix: str = "") -> str | None:
-    """Format a single message dict into a readable line, or None if it should be skipped."""
-    subtype = msg.get("subtype", "")
-    text = msg.get("text", "").strip()
-
-    if not text or subtype in _SKIP_SUBTYPES:
-        return None
-
-    ts = float(msg.get("ts", 0))
-    time_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
-
-    user_id = msg.get("user") or msg.get("bot_id", "")
-    if msg.get("user"):
-        author = resolve_user(client, user_id)
-    elif msg.get("bot_id"):
-        # Try to use the bot's username if available
-        author = msg.get("username") or f"Bot({msg.get('bot_id', '?')})"
-    else:
-        author = "Unknown"
-
-    return f"{prefix}[{time_str}] {author}: {text}"
-
-
-def fetch_thread_replies(client: WebClient, channel_id: str, thread_ts: str) -> list[str]:
+def fetch_thread_replies(
+    channel_id: str,
+    thread_ts: str,
+    token: str,
+    user_map: dict[str, str],
+) -> list[str]:
     """
-    Fetch all replies for a given thread. Returns formatted lines (indented).
-    The first message returned by conversations.replies is the root message itself,
-    so we skip it (index 0) to avoid duplicating it.
+    Fetch all replies for a thread via conversations.replies.
+    The first item is the root message itself — skip it to avoid duplication.
+    Returns formatted, indented lines.
     """
-    lines = []
-    try:
-        resp = client.conversations_replies(channel=channel_id, ts=thread_ts)
-        replies = resp.get("messages", [])
+    lines: list[str] = []
+    url = (
+        f"https://slack.com/api/conversations.replies"
+        f"?channel={channel_id}&ts={thread_ts}&limit=1000"
+    )
 
-        # Handle pagination for very long threads
-        while resp.get("has_more"):
-            next_cursor = resp.get("response_metadata", {}).get("next_cursor", "")
-            if not next_cursor:
-                break
-            resp = client.conversations_replies(
-                channel=channel_id,
-                ts=thread_ts,
-                cursor=next_cursor,
-            )
-            replies.extend(resp.get("messages", []))
+    data = slack_get(url, token)
+    if not data.get("ok"):
+        lines.append(f"    ↳ [Thread error: {data.get('error', 'unknown')}]")
+        return lines
 
-        # Skip index 0 — it's the root message (already printed)
-        for reply in replies[1:]:
-            line = format_message(client, reply, prefix="    ↳ ")
-            if line:
-                lines.append(line)
+    replies = data.get("messages", [])
 
-    except SlackApiError as e:
-        lines.append(f"    ↳ [Error fetching thread: {e.response.get('error', str(e))}]")
+    # Handle pagination for very long threads
+    while data.get("has_more"):
+        next_cursor = data.get("response_metadata", {}).get("next_cursor", "")
+        if not next_cursor:
+            break
+        data = slack_get(url + f"&cursor={next_cursor}", token)
+        replies.extend(data.get("messages", []))
+
+    # Skip index 0 — it is the root message (already printed)
+    for reply in replies[1:]:
+        subtype = reply.get("subtype", "")
+        text = reply.get("text", "").strip()
+        if not text or subtype in _SKIP_SUBTYPES:
+            continue
+
+        uid = reply.get("user") or reply.get("bot_id", "")
+        author = user_map.get(uid, uid or "Bot")
+        ts_str = format_timestamp(reply.get("ts", ""))
+        text = resolve_mentions(text, user_map)
+
+        lines.append(f"    ↳ [{ts_str}] {author}: {text}")
+
+        # Files in thread replies
+        for f in reply.get("files", []):
+            lines.append(f"      [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
 
     return lines
 
 
 # ---------------------------------------------------------------------------
-# Main History Fetcher
+# Main Fetcher
 # ---------------------------------------------------------------------------
 
 def fetch_history(channel_id: str, limit: int = 250) -> None:
-    token = os.environ.get("SLACK_BOT_TOKEN", "")
-    if not token:
-        print("Error: SLACK_BOT_TOKEN environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
+    token = get_token()
 
-    client = WebClient(token=token)
-    root_messages: list[dict] = []
+    # --- Fetch root messages ---
+    all_messages: list[dict] = []
+    remaining = limit
+    cursor_param = ""
 
-    try:
-        # Fetch root messages (conversations.history does NOT include thread replies)
-        remaining = limit
-        cursor = None
+    while remaining > 0:
+        batch_size = min(remaining, 1000)
+        url = (
+            f"https://slack.com/api/conversations.history"
+            f"?channel={channel_id}&limit={batch_size}{cursor_param}"
+        )
+        data = slack_get(url, token)
 
-        while remaining > 0:
-            batch_size = min(remaining, 1000)
-            kwargs: dict = {"channel": channel_id, "limit": batch_size}
-            if cursor:
-                kwargs["cursor"] = cursor
+        if not data.get("ok"):
+            error = data.get("error", "unknown_error")
+            print(f"Error fetching history: {error}", file=sys.stderr)
+            if error == "missing_scope":
+                print(
+                    "The Slack app requires 'channels:history' and/or 'groups:history' scopes.",
+                    file=sys.stderr,
+                )
+            elif error == "channel_not_found":
+                print("Check that the bot is a member of the channel.", file=sys.stderr)
+            sys.exit(1)
 
-            resp = client.conversations_history(**kwargs)
+        batch = data.get("messages", [])
+        all_messages.extend(batch)
+        remaining -= len(batch)
 
-            if not resp.get("ok"):
-                error = resp.get("error", "unknown_error")
-                print(f"Error fetching history: {error}", file=sys.stderr)
-                if error == "missing_scope":
-                    print(
-                        "The Slack app requires 'channels:history' and/or 'groups:history' scopes.",
-                        file=sys.stderr,
-                    )
-                sys.exit(1)
+        next_cursor = data.get("response_metadata", {}).get("next_cursor", "")
+        if not next_cursor or len(batch) < batch_size:
+            break
+        cursor_param = f"&cursor={next_cursor}"
 
-            batch = resp.get("messages", [])
-            root_messages.extend(batch)
-            remaining -= len(batch)
-
-            next_cursor = resp.get("response_metadata", {}).get("next_cursor", "")
-            if not next_cursor or len(batch) < batch_size:
-                break
-            cursor = next_cursor
-
-    except SlackApiError as e:
-        error = e.response.get("error", str(e))
-        print(f"Slack API error: {error}", file=sys.stderr)
-        if error == "channel_not_found":
-            print("Check that the bot is a member of the channel.", file=sys.stderr)
-        sys.exit(1)
-
-    if not root_messages:
+    if not all_messages:
         print("No messages found in this channel.")
         return
 
-    # Build chronological transcript
-    # conversations.history returns newest-first, so reverse for chronological order
+    print(f"Got {len(all_messages)} root messages. Resolving users...", file=sys.stderr)
+
+    # --- Build user map ---
+    user_map = build_user_map(all_messages, token)
+
+    # --- Build chronological transcript ---
+    # conversations.history returns newest-first → reverse for chronological order
     output_lines: list[str] = []
     thread_count = 0
     reply_count = 0
 
-    for msg in reversed(root_messages):
-        line = format_message(client, msg)
-        if not line:
+    for msg in reversed(all_messages):
+        subtype = msg.get("subtype", "")
+        text = msg.get("text", "").strip()
+
+        if not text or subtype in _SKIP_SUBTYPES:
             continue
 
-        output_lines.append(line)
+        uid = msg.get("user") or msg.get("bot_id", "")
+        author = user_map.get(uid, uid or "Bot")
+        ts_str = format_timestamp(msg.get("ts", ""))
+        text = resolve_mentions(text, user_map)
 
-        # If this root message has thread replies, fetch them all
+        output_lines.append(f"[{ts_str}] {author}: {text}")
+
+        # Files attached to root message
+        for f in msg.get("files", []):
+            output_lines.append(
+                f"  [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]"
+            )
+
+        # Attachments (link previews, etc.)
+        for a in msg.get("attachments", []):
+            title = a.get("title") or a.get("text", "")[:60] or "attachment"
+            output_lines.append(f"  [Attachment: {title}]")
+
+        # Thread replies
         if msg.get("reply_count", 0) > 0:
             thread_ts = msg.get("ts", "")
-            thread_lines = fetch_thread_replies(client, channel_id, thread_ts)
+            thread_lines = fetch_thread_replies(channel_id, thread_ts, token, user_map)
             if thread_lines:
                 output_lines.extend(thread_lines)
                 thread_count += 1
                 reply_count += len(thread_lines)
 
-    root_count = len([l for l in output_lines if not l.startswith("    ↳")])
+    root_count = sum(1 for l in output_lines if not l.startswith("    ↳"))
     print(
         f"--- CHANNEL HISTORY "
-        f"({root_count} messages, {thread_count} threads, {reply_count} replies) ---"
+        f"({root_count} messages · {thread_count} threads · {reply_count} replies) ---"
     )
     print("\n".join(output_lines))
     print("--- END OF HISTORY ---")
@@ -236,7 +303,10 @@ def fetch_history(channel_id: str, limit: int = 250) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Fetch Slack channel history (including thread replies) and print a clean transcript."
+        description=(
+            "Fetch Slack channel history (including thread replies) "
+            "and print a clean transcript. Zero external dependencies."
+        )
     )
     parser.add_argument("channel_id", help="Slack channel ID (e.g. C0B9YPS8HDZ)")
     parser.add_argument(
@@ -244,7 +314,7 @@ def main() -> None:
         type=int,
         default=250,
         metavar="N",
-        help="Number of root messages to fetch (default: 250). Thread replies are always fetched in full.",
+        help="Number of root messages to fetch (default: 250). Thread replies always fetched in full.",
     )
     args = parser.parse_args()
 
