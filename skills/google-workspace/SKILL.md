@@ -1,7 +1,7 @@
 ---
 name: google-workspace
 description: "Use Google Workspace APIs to create Google Docs, Slides, Sheets, and Calendar events. Covers authentication, creating documents, uploading to Drive, and returning links to users via Slack."
-version: 2.0.0
+version: 2.1.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
@@ -11,22 +11,33 @@ metadata:
 
 # Google Workspace — Create & Deliver
 
-> **Auth is already configured.** The OAuth token lives at `~/.hermes/google_token.json`.
-> Do NOT ask the user to set up OAuth or download credentials — it is done.
+---
+
+## 🚫 ABSOLUTE RULE — READ THIS FIRST
+
+**YOU MUST NEVER:**
+- Write a Python script to a temp file (e.g. `/tmp/*.py`)
+- Use `python3 - << 'EOF' ... EOF` inline heredocs
+- Generate any Python code for Google Docs, Slides, Sheets, or Calendar
+- Use `write_file` or any file-creation tool to produce Python scripts
+
+**Pre-installed scripts exist for every operation. Use them. Period.**
+
+If you find yourself about to write Python, STOP — look up the correct pre-installed script below instead.
 
 ---
 
-## ⛔ CRITICAL — Do NOT generate Python code
+## Pre-installed Scripts — Use These Directly
 
-**All Google Workspace operations use pre-installed scripts.** Do NOT write or generate Python code for Docs, Slides, Sheets, or Calendar. Run the correct script directly.
+All scripts live at `/opt/data/custom-skills/google-workspace/scripts/`.
 
-Script directory: `/opt/data/custom-skills/google-workspace/scripts/`
+Run them with `run_command`. No code writing. No temp files. Just call the script.
 
 ---
 
 ## Auth — No Token Found
 
-If a script outputs an auth prompt (starting with 🔗), copy and send that message verbatim to the user. Do not try to fix or generate auth code yourself.
+If a script prints a message starting with 🔗, forward that message verbatim to the user. Do not attempt to generate auth code.
 
 ---
 
@@ -39,9 +50,11 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_doc.py \
   "<CONTENT>"
 ```
 
-- `SLACK_USER_ID` — from the current Slack message context
-- `TITLE` — the document title
-- `CONTENT` — full text body (can be multiline, quote carefully)
+| Arg | Description |
+|---|---|
+| `SLACK_USER_ID` | From the current Slack message context |
+| `TITLE` | Document title |
+| `CONTENT` | Full text body. Quote it carefully. |
 
 ---
 
@@ -54,8 +67,11 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_slides.py \
   '<SLIDES_JSON>'
 ```
 
-- `SLIDES_JSON` — a JSON array of slide objects: `[{"title":"Slide 1","body":"Content"},...]`
-- Omit `SLIDES_JSON` to create a blank presentation.
+| Arg | Description |
+|---|---|
+| `SLACK_USER_ID` | From the current Slack message context |
+| `TITLE` | Presentation title |
+| `SLIDES_JSON` | JSON array: `[{"title":"Slide 1","body":"Content"},{"title":"Slide 2","body":"More"}]` — omit for blank |
 
 ---
 
@@ -68,8 +84,11 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_sheet.py \
   '<DATA_JSON>'
 ```
 
-- `DATA_JSON` — a JSON 2D array: `[["Header A","Header B"],["Row1A","Row1B"],...]`
-- Omit `DATA_JSON` to create an empty sheet.
+| Arg | Description |
+|---|---|
+| `SLACK_USER_ID` | From the current Slack message context |
+| `TITLE` | Spreadsheet title |
+| `DATA_JSON` | JSON 2D array: `[["Header A","Header B"],["Row 1A","Row 1B"]]` — omit for empty |
 
 ---
 
@@ -82,20 +101,21 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_calendar_event.p
 ```
 
 `EVENT_JSON` fields:
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `title` | string | ✅ | Event name |
-| `start` | ISO 8601 string | ✅ | `"2026-06-25T10:00:00+07:00"` or `"2026-06-25"` for all-day |
+| `start` | ISO 8601 string | ✅ | `"2026-06-25T10:00:00+07:00"` (timed) or `"2026-06-25"` (all-day) |
 | `end` | ISO 8601 string | ✅ | Same format as `start` |
-| `description` | string | ❌ | Event description |
-| `attendees` | array of emails | ❌ | `["alice@example.com"]` |
-| `timezone` | string | ❌ | Default `"UTC"`, e.g. `"Asia/Jakarta"` |
+| `description` | string | ❌ | Event details |
+| `attendees` | array of emails | ❌ | `["alice@example.com", "bob@example.com"]` |
+| `timezone` | string | ❌ | Default `"UTC"` — e.g. `"Asia/Jakarta"` |
 
 ---
 
 ## Delivering Results to Slack
 
-After running any script, **send only the link** — do not summarize the document content in chat.
+After running any script, **send only the link** — do not summarize document content.
 
 ```
 ✅ Done! Here's your Google Doc:
