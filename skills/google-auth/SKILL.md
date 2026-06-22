@@ -14,6 +14,7 @@ metadata:
 ## When to apply this skill
 
 Apply this skill whenever you encounter **any of the following**:
+- The user explicitly asks to authenticate, log in, or connect their Google Workspace account (e.g., "authenticate me", "login to google")
 - A Google API call fails with an authentication or authorization error
 - `token.json` is missing or expired
 - Google Drive, Docs, Calendar, or Sheets returns a 401 / 403 error
@@ -26,11 +27,22 @@ Apply this skill whenever you encounter **any of the following**:
 
 ## What to do instead
 
-When Google authentication is required, send the following message to the user in Slack:
+When Google authentication is required (or requested), send the following message to the user in Slack:
 
 ---
 
-**Template (adapt tone to the conversation):**
+**Template for explicit authentication requests (e.g. "authenticate me"):**
+
+> 🔗 **Connect your personal Google account**
+> 
+> To authorize Hermes to use your Google Workspace account, please visit this setup page:
+> 👉 [Helper URL]/oauth/start?user=<SLACK_USER_ID>
+> 
+> *(Replace `[Helper URL]` with the URL from `config.yaml` -> `google_drive.oauth_helper_url` and `<SLACK_USER_ID>` with the actual Slack user ID).*
+
+---
+
+**Template for failed API calls (adapt tone to the conversation):**
 
 > ⚠️ **Google authorization needed**
 >
