@@ -16,14 +16,17 @@ metadata:
 ## 🚫 ABSOLUTE RULE — READ THIS FIRST
 
 **YOU MUST NEVER:**
-- Write a Python script to a temp file (e.g. `/tmp/*.py`)
+- Write a Python script to **any** path — `/tmp/`, `/opt/data/`, `~`, or anywhere else
 - Use `python3 - << 'EOF' ... EOF` inline heredocs
-- Generate any Python code for Google Docs, Slides, Sheets, or Calendar
-- Use `write_file` or any file-creation tool to produce Python scripts
+- Use `write_file`, `patch`, or any tool to create `.py` files on the fly
+- Fall back to writing custom code when a script "doesn't support" something
 
-**Pre-installed scripts exist for every operation. Use them. Period.**
+**If a pre-installed script fails or returns an error:**
+- Copy the exact error message and report it to the user
+- Do NOT attempt to write a replacement or workaround script
+- Respond: "⛔ The pre-installed script encountered an error: `<exact error>`. Please ask your admin to check the script."
 
-If you find yourself about to write Python, STOP — look up the correct pre-installed script below instead.
+**Pre-installed scripts already exist for every operation. Use them. Period.**
 
 ---
 
