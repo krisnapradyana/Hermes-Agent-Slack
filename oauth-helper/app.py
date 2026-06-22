@@ -18,6 +18,11 @@ from google_auth_oauthlib.flow import Flow
 CLIENT_SECRETS_FILE = "/documents/google_client_secret.json"
 TOKEN_FILE          = "/documents/token.json"
 
+# Public-facing base URL of this OAuth helper (e.g. http://103.49.239.127:8643).
+# MUST match the redirect URI registered in Google Cloud Console.
+# Falls back to request host if not set (only works for local access).
+PUBLIC_URL = os.environ.get("OAUTH_PUBLIC_URL", "").rstrip("/")
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
@@ -29,6 +34,19 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "hermes-oauth-helper-default
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+def get_redirect_uri() -> str:
+    """Return the OAuth callback URL using OAUTH_PUBLIC_URL if configured.
+
+    Using url_for(_external=True) is unreliable for remote users because Flask
+    sees the internal/container hostname, not the public IP. OAUTH_PUBLIC_URL
+    must match exactly what is registered in Google Cloud Console.
+    """
+    if PUBLIC_URL:
+        return f"{PUBLIC_URL}/oauth/callback"
+    # Fallback — only works when accessed from the same machine as the server
+    return url_for("oauth_callback", _external=True)
+
+
 def get_connection_status() -> dict:
     """Check if token.json exists and is still valid (not expired)."""
     if not os.path.exists(TOKEN_FILE):
@@ -73,10 +91,11 @@ def oauth_start():
                     "Please make sure the file is mounted correctly.",
         )
 
+    redirect_uri = get_redirect_uri()
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri=url_for('oauth_callback', _external=True),
+        redirect_uri=redirect_uri,
     )
     auth_url, state = flow.authorization_url(
         access_type="offline",
@@ -84,6 +103,7 @@ def oauth_start():
         prompt="consent",          # Forces refresh_token to always be returned
     )
     session["oauth_state"] = state
+    session["redirect_uri"] = redirect_uri  # store so callback uses the same value
     return redirect(auth_url)
 
 
@@ -103,13 +123,37 @@ def oauth_callback():
         )
 
     try:
+        # Use the same redirect_uri that was used in oauth_start.
+        # IMPORTANT: fetch_token validates that the redirect_uri matches exactly
+        # what Google received. We must NOT use request.url here because Flask
+        # may see http://localhost/... while Google sent the user to the public IP.
+        redirect_uri = session.pop("redirect_uri", get_redirect_uri())
+
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
             state=state,
-            redirect_uri=url_for('oauth_callback', _external=True),
+            redirect_uri=redirect_uri,
         )
-        flow.fetch_token(authorization_response=request.url)
+
+        # Reconstruct the full callback URL using the public base so it matches
+        # the redirect_uri registered in Google Cloud Console.
+        # request.url may contain the container-internal host/IP instead of the
+        # public-facing one, which would cause a redirect_uri_mismatch error.
+        if PUBLIC_URL:
+            # Replace scheme+host with the public URL, keep query string intact
+            from urllib.parse import urlparse, urlunparse
+            parsed = urlparse(request.url)
+            pub = urlparse(PUBLIC_URL)
+            auth_response = urlunparse((
+                pub.scheme, pub.netloc,
+                parsed.path, parsed.params,
+                parsed.query, parsed.fragment,
+            ))
+        else:
+            auth_response = request.url
+
+        flow.fetch_token(authorization_response=auth_response)
         credentials = flow.credentials
 
         # Persist token to shared volume
@@ -135,8 +179,8 @@ def oauth_disconnect():
 def status():
     """JSON health endpoint for quick checks."""
     s = get_connection_status()
-    s["helper_url"] = request.host_url.rstrip('/')
-    s["redirect_uri"] = url_for('oauth_callback', _external=True)
+    s["helper_url"] = PUBLIC_URL or request.host_url.rstrip("/")
+    s["redirect_uri"] = get_redirect_uri()
     return s
 
 

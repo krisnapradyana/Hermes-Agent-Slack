@@ -13,4 +13,5 @@ ENV OAUTHLIB_INSECURE_TRANSPORT=1
 
 EXPOSE 8643
 
-CMD ["python", "app.py"]
+# Run token refresher in background + Flask web UI in foreground
+CMD ["sh", "-c", "python token_refresher.py & python app.py"]
