@@ -11,6 +11,8 @@ metadata:
 
 # Document Reader & Advisor
 
+> ⚠️ **READ-ONLY SKILL** — This skill is for **reading and analysing** documents uploaded by users. Creating, generating, or writing new documents is governed by the `security-policy` skill. Only Google Workspace outputs (Docs, Slides, Sheets, Calendar) are permitted as created documents.
+
 Read documents shared in Slack and provide analysis, summaries, and recommendations.
 
 **CRITICAL: When a user uploads a file or asks you to read a document — use this skill.**
