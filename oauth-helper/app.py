@@ -34,29 +34,6 @@ USER_TOKEN_DIR      = "/documents/user_tokens"          # per-user tokens
 
 LOOPBACK_REDIRECT_URI = "http://localhost"
 
-def get_redirect_uri() -> str:
-    """Return the dynamic redirect URI for single-click auth, or loopback for paste-flow."""
-    try:
-        with open(CLIENT_SECRETS_FILE, "r") as f:
-            if "installed" in json.load(f):
-                # Desktop apps strictly forbid paths in redirect_uris (e.g. no /oauth/callback)
-                # They only allow http://localhost or http://127.0.0.1 with any port.
-                # We use standard loopback to force the paste-based flow.
-                return LOOPBACK_REDIRECT_URI
-    except Exception:
-        pass
-
-    if PUBLIC_URL:
-        return PUBLIC_URL + "/oauth/callback"
-    
-    host_url = request.host_url.rstrip("/")
-    if "localhost" in host_url or "127.0.0.1" in host_url:
-        return host_url + "/oauth/callback"
-        
-    # If accessed via a remote IP address, Google will reject it as a Web App redirect URI.
-    # Fall back to the loopback paste flow.
-    return LOOPBACK_REDIRECT_URI
-
 # Relax token scope matching to allow Google to return different (e.g. more) scopes
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
@@ -141,7 +118,7 @@ def make_auth_url_for(user_id: str | None) -> tuple[str, str]:
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri=get_redirect_uri(),
+        redirect_uri=LOOPBACK_REDIRECT_URI,
     )
     auth_url, state = flow.authorization_url(
         access_type="offline",
@@ -235,10 +212,10 @@ def oauth_paste():
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
             state=state or stored_state,
-            redirect_uri=get_redirect_uri(),
+            redirect_uri=LOOPBACK_REDIRECT_URI,
         )
 
-        loopback = urlparse(get_redirect_uri())
+        loopback = urlparse(LOOPBACK_REDIRECT_URI)
         auth_response = urlunparse((
             loopback.scheme, loopback.netloc,
             parsed.path or "/", "",
@@ -281,55 +258,8 @@ def status():
     s = get_connection_status(user_id)
     s["user_id"]      = user_id or "shared"
     s["helper_url"]   = display_url()
-    s["redirect_uri"] = get_redirect_uri()
+    s["redirect_uri"] = LOOPBACK_REDIRECT_URI
     return s
-
-@app.route("/oauth/callback")
-def oauth_callback():
-    """Automatic single-click callback from Google OAuth."""
-    # User ID can come from session (set in oauth_start) or query param
-    user_id = sanitize_user_id(
-        session.get("oauth_user_id") or request.args.get("user")
-    )
-    
-    error = request.args.get("error")
-    if error:
-        return render_template("error.html",
-                               message=f"Google returned an error: {error}")
-
-    code = request.args.get("code")
-    state = request.args.get("state")
-    
-    if not code:
-        return render_template("error.html", message="No authorization code found in callback.")
-
-    stored_state = session.get("oauth_state")
-    if stored_state and state and stored_state != state:
-        return render_template("error.html", message="State mismatch — please start over.")
-
-    try:
-        flow = Flow.from_client_secrets_file(
-            CLIENT_SECRETS_FILE,
-            scopes=SCOPES,
-            state=state or stored_state,
-            redirect_uri=get_redirect_uri(),
-        )
-
-        # For the callback, we can just pass the full URL
-        flow.fetch_token(authorization_response=request.url)
-        credentials = flow.credentials
-
-        token_path = get_token_file(user_id)
-        with open(token_path, "w") as f:
-            f.write(credentials.to_json())
-
-        session.pop("oauth_state",   None)
-        session.pop("oauth_user_id", None)
-        return render_template("success.html", user_id=user_id)
-
-    except Exception as e:
-        return render_template("error.html", message=str(e))
-
 
 @app.route("/users")
 def users_json():
