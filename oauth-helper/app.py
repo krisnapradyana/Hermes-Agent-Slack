@@ -18,6 +18,7 @@ Auth flow (paste-based, works for any remote user without a domain name):
 
 import os
 import re
+import json
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlunparse
 
@@ -34,9 +35,27 @@ USER_TOKEN_DIR      = "/documents/user_tokens"          # per-user tokens
 LOOPBACK_REDIRECT_URI = "http://localhost"
 
 def get_redirect_uri() -> str:
-    """Return the dynamic redirect URI for single-click auth."""
-    # We use display_url() which handles PUBLIC_URL override or request.host_url
-    return display_url() + "/oauth/callback"
+    """Return the dynamic redirect URI for single-click auth, or loopback for paste-flow."""
+    try:
+        with open(CLIENT_SECRETS_FILE, "r") as f:
+            if "installed" in json.load(f):
+                # Desktop apps strictly forbid paths in redirect_uris (e.g. no /oauth/callback)
+                # They only allow http://localhost or http://127.0.0.1 with any port.
+                # We use standard loopback to force the paste-based flow.
+                return LOOPBACK_REDIRECT_URI
+    except Exception:
+        pass
+
+    if PUBLIC_URL:
+        return PUBLIC_URL + "/oauth/callback"
+    
+    host_url = request.host_url.rstrip("/")
+    if "localhost" in host_url or "127.0.0.1" in host_url:
+        return host_url + "/oauth/callback"
+        
+    # If accessed via a remote IP address, Google will reject it as a Web App redirect URI.
+    # Fall back to the loopback paste flow.
+    return LOOPBACK_REDIRECT_URI
 
 # Relax token scope matching to allow Google to return different (e.g. more) scopes
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
