@@ -4,7 +4,7 @@ cleanup_temp_files.py — Startup / on-demand sweep of stale generated temp file
 Run automatically by the Hermes container entrypoint when cleanup.on_startup=true.
 Can also be called manually:
 
-  python /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py [--dry-run]
+  python /opt/data/custom-skills/media/seedance/scripts/cleanup_temp_files.py [--dry-run]
 
 Reads settings from config.yaml (cleanup section):
   on_startup      (bool) — if false, this script exits immediately without doing anything

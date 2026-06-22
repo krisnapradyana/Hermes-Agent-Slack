@@ -28,12 +28,13 @@ services:
         ln -sf /opt/soul/SOUL.md $$HOME/.hermes/SOUL.md &&
         ln -sf /documents/google_client_secret.json $$HOME/.hermes/google_client_secret.json &&
         ln -sf /documents/token.json $$HOME/.hermes/google_token.json &&
+        ln -sf /opt/data/config.yaml $$HOME/.hermes/config.yaml &&
         mkdir -p /documents/user_tokens &&
         ln -sfn /documents/user_tokens $$HOME/.hermes/user_tokens &&
 
         /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
 
-        /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py &&
+        /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/media/seedance/scripts/cleanup_temp_files.py &&
         hermes gateway run
       "
     depends_on:

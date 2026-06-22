@@ -32,7 +32,7 @@ metadata:
 
 ## Pre-installed Scripts — Use These Directly
 
-All scripts live at `/opt/data/custom-skills/google-workspace/scripts/`.
+All scripts live at `/opt/data/custom-skills/google/google-workspace/scripts/`.
 
 Run them with `run_command`. No code writing. No temp files. Just call the script.
 
@@ -47,7 +47,7 @@ If a script prints a message starting with 🔗, forward that message verbatim t
 ## Create a Google Doc
 
 ```bash
-python3 /opt/data/custom-skills/google-workspace/scripts/create_doc.py \
+python3 /opt/data/custom-skills/google/google-workspace/scripts/create_doc.py \
   "<SLACK_USER_ID>" \
   "<TITLE>" \
   "<CONTENT>"
@@ -64,7 +64,7 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_doc.py \
 ## Create a Google Slides Presentation
 
 ```bash
-python3 /opt/data/custom-skills/google-workspace/scripts/create_slides.py \
+python3 /opt/data/custom-skills/google/google-workspace/scripts/create_slides.py \
   "<SLACK_USER_ID>" \
   "<TITLE>" \
   '<SLIDES_JSON>'
@@ -81,7 +81,7 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_slides.py \
 ## Create a Google Sheet
 
 ```bash
-python3 /opt/data/custom-skills/google-workspace/scripts/create_sheet.py \
+python3 /opt/data/custom-skills/google/google-workspace/scripts/create_sheet.py \
   "<SLACK_USER_ID>" \
   "<TITLE>" \
   '<DATA_JSON>'
@@ -98,7 +98,7 @@ python3 /opt/data/custom-skills/google-workspace/scripts/create_sheet.py \
 ## Create a Google Calendar Event
 
 ```bash
-python3 /opt/data/custom-skills/google-workspace/scripts/create_calendar_event.py \
+python3 /opt/data/custom-skills/google/google-workspace/scripts/create_calendar_event.py \
   "<SLACK_USER_ID>" \
   '<EVENT_JSON>'
 ```

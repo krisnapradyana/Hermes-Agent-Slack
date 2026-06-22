@@ -107,7 +107,7 @@ We prioritize native Slack attachments using the `[MEDIA: /path/to/file]` tag. B
 **Phase 1: Direct Slack Attachment (Priority)**
 1. Call the helper script with the `--download-only` flag to get a local path:
    ```bash
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --download-only
+   python /opt/data/custom-skills/media/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --download-only
    ```
 2. The script will output `Local Path: /tmp/seedance_xxxx.mp4`.
 3. Reply to the user directly, embedding the path inside a `MEDIA` tag:
@@ -125,7 +125,7 @@ We prioritize native Slack attachments using the `[MEDIA: /path/to/file]` tag. B
 2. Find the `google_drive.folder_id` in `config.yaml` if it exists.
 3. Call the helper script **without** `--download-only`:
    ```bash
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --folder "FOLDER_ID_HERE"
+   python /opt/data/custom-skills/media/seedance/scripts/download_and_upload.py --url "VIDEO_OR_IMAGE_URL_HERE" --folder "FOLDER_ID_HERE"
    ```
 4. Return the generated Google Drive link to the user.
 

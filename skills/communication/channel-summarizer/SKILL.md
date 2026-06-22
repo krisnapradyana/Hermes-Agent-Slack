@@ -37,7 +37,7 @@ metadata:
 
 ## Pre-installed Script
 
-Script path: `/opt/data/custom-skills/channel-summarizer/fetch_history.py`
+Script path: `/opt/data/custom-skills/communication/channel-summarizer/fetch_history.py`
 
 ---
 
@@ -62,7 +62,7 @@ Script path: `/opt/data/custom-skills/channel-summarizer/fetch_history.py`
 ### Case 1 — Recent history (no date specified)
 
 ```bash
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --limit 250
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --limit 250
 ```
 
 Use when the user says: *"summarize the chat"*, *"catch me up"*, *"what did I miss?"*
@@ -72,7 +72,7 @@ Use when the user says: *"summarize the chat"*, *"catch me up"*, *"what did I mi
 ### Case 2 — From a specific date onwards
 
 ```bash
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD
 ```
 
 Use when the user says: *"summarize since January 1st"*, *"what happened after the launch?"*
@@ -82,7 +82,7 @@ Use when the user says: *"summarize since January 1st"*, *"what happened after t
 ### Case 3 — Up to a specific date
 
 ```bash
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --until YYYY-MM-DD
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --until YYYY-MM-DD
 ```
 
 ---
@@ -90,7 +90,7 @@ python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID>
 ### Case 4 — Date range (most common for historical queries)
 
 ```bash
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD --until YYYY-MM-DD
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD --until YYYY-MM-DD
 ```
 
 Use when the user says: *"summarize last December"*, *"what happened in Q1 2025?"*, *"recap messages from winter"*
@@ -98,19 +98,19 @@ Use when the user says: *"summarize last December"*, *"what happened in Q1 2025?
 **Examples:**
 ```bash
 # Last 250 messages (default)
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py C0B9YPS8HDZ
 
 # All of December 2024
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2024-12-01 --until 2024-12-31
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2024-12-01 --until 2024-12-31
 
 # Q1 2025 (Jan–Mar)
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-01-01 --until 2025-03-31
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-01-01 --until 2025-03-31
 
 # Single day
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-22 --until 2025-06-22
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-22 --until 2025-06-22
 
 # From a date to now (no --until)
-python3 /opt/data/custom-skills/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-01
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py C0B9YPS8HDZ --since 2025-06-01
 ```
 
 ---

@@ -59,10 +59,10 @@ You are **ONLY permitted** to create documents using the following Google Worksp
 
 | ✅ Allowed | Pre-installed Script |
 |---|---|
-| Google Docs | `/opt/data/custom-skills/google-workspace/scripts/create_doc.py` |
-| Google Slides | `/opt/data/custom-skills/google-workspace/scripts/create_slides.py` |
-| Google Sheets | `/opt/data/custom-skills/google-workspace/scripts/create_sheet.py` |
-| Google Calendar | `/opt/data/custom-skills/google-workspace/scripts/create_calendar_event.py` |
+| Google Docs | `/opt/data/custom-skills/google/google-workspace/scripts/create_doc.py` |
+| Google Slides | `/opt/data/custom-skills/google/google-workspace/scripts/create_slides.py` |
+| Google Sheets | `/opt/data/custom-skills/google/google-workspace/scripts/create_sheet.py` |
+| Google Calendar | `/opt/data/custom-skills/google/google-workspace/scripts/create_calendar_event.py` |
 
 **ALL other document formats are STRICTLY PROHIBITED**, including but not limited to:
 
@@ -101,7 +101,7 @@ This includes using `write_file`, `patch`, or any other tool to create a `.py` f
 
 **If the pre-installed script is missing or fails:**
 
-> ⛔ The pre-installed script for this operation encountered an error: `<exact error>`. Please ask your admin to check the script at `/opt/data/custom-skills/google-workspace/scripts/`.
+> ⛔ The pre-installed script for this operation encountered an error: `<exact error>`. Please ask your admin to check the script at `/opt/data/custom-skills/google/google-workspace/scripts/`.
 
 ---
 

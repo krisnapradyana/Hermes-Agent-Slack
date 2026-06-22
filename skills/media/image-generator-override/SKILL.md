@@ -52,7 +52,7 @@ Supported aspect ratios: `16:9` (default), `9:16`, `1:1`, `4:3`, `21:9`
 
 1. Run the download helper to get the local path:
    ```bash
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "IMAGE_URL_HERE" --download-only
+   python /opt/data/custom-skills/media/seedance/scripts/download_and_upload.py --url "IMAGE_URL_HERE" --download-only
    ```
 2. Attach directly to Slack using the `MEDIA` tag:
    ```
@@ -64,5 +64,5 @@ Supported aspect ratios: `16:9` (default), `9:16`, `1:1`, `4:3`, `21:9`
    ```
 3. If the Slack attachment fails, fall back to Google Drive:
    ```bash
-   python /opt/data/custom-skills/seedance/scripts/download_and_upload.py --url "IMAGE_URL_HERE" --folder "FOLDER_ID_HERE"
+   python /opt/data/custom-skills/media/seedance/scripts/download_and_upload.py --url "IMAGE_URL_HERE" --folder "FOLDER_ID_HERE"
    ```

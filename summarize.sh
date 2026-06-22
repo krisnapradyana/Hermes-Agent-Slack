@@ -60,5 +60,5 @@ echo "Fetching last ${LIMIT} messages from channel ${CHANNEL_ID}..." >&2
 
 docker exec "${CONTAINER}" \
     /opt/hermes/.venv/bin/python3 \
-    /opt/data/custom-skills/channel-summarizer/fetch_history.py \
+    /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py \
     "${CHANNEL_ID}" --limit "${LIMIT}"
