@@ -28,26 +28,46 @@ They are at fixed, known paths. If they are missing, instruct the user to re-aut
 ```python
 import os
 
-# OAuth token (symlinked from /documents/token.json at container start)
-TOKEN_FILE = os.path.expanduser("~/.hermes/google_token.json")
+SLACK_USER_ID  = "<the Slack user_id from the current message>"  # e.g. "U04AQDZQYP4"
 
-# OAuth client secret (symlinked from /documents/google_client_secret.json)
-CLIENT_SECRET_FILE = os.path.expanduser("~/.hermes/google_client_secret.json")
+USER_TOKEN_DIR = os.path.expanduser("~/.hermes/user_tokens")
+USER_TOKEN     = os.path.join(USER_TOKEN_DIR, f"{SLACK_USER_ID}.json")
+SHARED_TOKEN   = os.path.expanduser("~/.hermes/google_token.json")
+
+# Pick the right token: prefer per-user, fall back to shared
+if os.path.exists(USER_TOKEN):
+    TOKEN_FILE = USER_TOKEN
+elif os.path.exists(SHARED_TOKEN):
+    TOKEN_FILE = SHARED_TOKEN
+else:
+    TOKEN_FILE = None
 ```
 
-`os.path.expanduser("~")` resolves the container's actual home directory automatically — no guessing, no searching.
+### If TOKEN_FILE is None — post this in Slack and stop:
+
+```
+🔗 To use Google Workspace, please connect your Google account first:
+👉 http://103.49.239.127:8643/oauth/start?user=<SLACK_USER_ID>
+
+(Takes ~1 minute. After that, your Docs, Sheets, Slides, and Calendar events
+will be created under your own Google account.)
+```
+
+Replace `<SLACK_USER_ID>` with the actual Slack user ID from the current message.
 
 ---
 
 ## Authentication — Always Use This Pattern
-
 
 ```python
 import os
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
-TOKEN_FILE = os.path.expanduser("~/.hermes/google_token.json")
+# Use the TOKEN_FILE resolved in the 'File Paths' section above:
+# (If TOKEN_FILE is None, post the auth prompt in Slack and stop execution)
+if not TOKEN_FILE:
+    raise FileNotFoundError("No Google OAuth token found. Instruct user to connect.")
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
@@ -63,7 +83,7 @@ if creds.expired and creds.refresh_token:
     creds.refresh(Request())
 ```
 
-If `Credentials.from_authorized_user_file` raises `FileNotFoundError`, apply the `google-auth-helper` skill.
+If `Credentials.from_authorized_user_file` raises `FileNotFoundError`, post the authorization prompt link to Slack.
 
 ---
 
@@ -211,7 +231,24 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-TOKEN_FILE = os.path.expanduser("~/.hermes/google_token.json")
+SLACK_USER_ID  = "<the Slack user_id from the current message>"
+
+USER_TOKEN_DIR = os.path.expanduser("~/.hermes/user_tokens")
+USER_TOKEN     = os.path.join(USER_TOKEN_DIR, f"{SLACK_USER_ID}.json")
+SHARED_TOKEN   = os.path.expanduser("~/.hermes/google_token.json")
+
+# Pick the right token: prefer per-user, fall back to shared
+if os.path.exists(USER_TOKEN):
+    TOKEN_FILE = USER_TOKEN
+elif os.path.exists(SHARED_TOKEN):
+    TOKEN_FILE = SHARED_TOKEN
+else:
+    TOKEN_FILE = None
+
+if TOKEN_FILE is None:
+    print(f"🔗 To use Google Workspace, please connect your Google account first:\n👉 http://103.49.239.127:8643/oauth/start?user={SLACK_USER_ID}")
+    exit(0)
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/documents",

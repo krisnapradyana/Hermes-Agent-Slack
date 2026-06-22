@@ -240,6 +240,11 @@
     <h1>Step 1 — Sign in with Google</h1>
     <p class="subtitle">Click the button below to open Google sign-in, then come back here.</p>
 
+    {% if user_id %}
+    <div style="background:rgba(99,60,255,.08);border:1px solid rgba(99,60,255,.2);border-radius:12px;padding:.8rem 1.1rem;margin-bottom:1.5rem;font-size:.82rem;color:rgba(180,165,255,.85);">
+      🔗 Authorizing for Slack user: <code style="background:rgba(0,0,0,.25);padding:2px 6px;border-radius:4px;">{{ user_id }}</code>
+    </div>
+    {% endif %}
     <div class="steps">
       <div class="step active">
         <div class="step-num">1</div>
@@ -284,7 +289,7 @@
 
     <div class="divider"></div>
 
-    <a href="/oauth/paste" class="btn-next">
+    <a href="/oauth/paste{% if user_id %}?user={{ user_id }}{% endif %}" class="btn-next">
       I've authorized — Paste the URL →
     </a>
 

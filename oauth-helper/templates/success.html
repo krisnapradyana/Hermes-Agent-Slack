@@ -124,12 +124,21 @@
     <div class="checkmark">✅</div>
 
     <h1>You're Connected!</h1>
-    <p class="subtitle">Google Drive access has been authorized successfully.</p>
+    {% if user_id %}
+    <p class="subtitle">Google Workspace access for <code style="background:rgba(52,211,153,.1);padding:2px 8px;border-radius:4px;color:#34d399;">{{ user_id }}</code> has been authorized.</p>
+    {% else %}
+    <p class="subtitle">Shared Google Workspace access has been authorized successfully.</p>
+    {% endif %}
 
     <div class="info-box">
       <strong>What happens next?</strong><br>
-      The Hermes agent will now automatically use this authorization when your team
-      asks it to upload files or access Google Drive via Slack.
+      {% if user_id %}
+      Hermes will now use <strong>your personal Google account</strong> when you ask it to create
+      Docs, Sheets, Slides, or Calendar events in Slack. Documents will be owned by your account.
+      {% else %}
+      The Hermes agent will now automatically use this shared authorization when any team member
+      asks it to access Google Workspace via Slack.
+      {% endif %}
       <br><br>
       You <strong>don't need to do this again</strong> unless the token is revoked or you disconnect manually.
     </div>

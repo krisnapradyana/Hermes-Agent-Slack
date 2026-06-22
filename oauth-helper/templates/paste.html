@@ -246,6 +246,11 @@
     <h1>Step 2 — Paste the Redirect URL</h1>
     <p class="subtitle">After signing in with Google, your browser was redirected to <code>localhost</code> and showed an error. That's expected — copy the full URL from your address bar and paste it below.</p>
 
+    {% if user_id %}
+    <div style="background:rgba(99,60,255,.08);border:1px solid rgba(99,60,255,.2);border-radius:12px;padding:.8rem 1.1rem;margin-bottom:1.2rem;font-size:.82rem;color:rgba(180,165,255,.85);">
+      🔗 Authorizing for Slack user: <code style="background:rgba(0,0,0,.25);padding:2px 6px;border-radius:4px;">{{ user_id }}</code>
+    </div>
+    {% endif %}
     <div class="instruction-box">
       <ol>
         <li>In your browser, look at the <strong>address bar</strong> — even though the page shows an error, the URL should start with <code>http://localhost/?state=...&amp;code=...</code></li>
@@ -256,6 +261,7 @@
     </div>
 
     <form method="POST" action="/oauth/paste">
+      {% if user_id %}<input type="hidden" name="user_id" value="{{ user_id }}" />{% endif %}
       <label for="redirect_url">Paste the full URL from your browser's address bar:</label>
       <textarea
         id="redirect_url"

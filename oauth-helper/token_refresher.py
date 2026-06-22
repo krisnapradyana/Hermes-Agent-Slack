@@ -1,31 +1,29 @@
 """
-token_refresher.py — Background token keepalive for Hermes
+token_refresher.py — Background token keepalive for Hermes (Multi-User)
 
 Runs as a daemon inside the oauth-helper container.
-Refreshes /documents/token.json every 12 hours so the access token
-never goes stale between Slack interactions.
+Refreshes ALL token files every 12 hours:
+  - /documents/token.json          (shared/admin token)
+  - /documents/user_tokens/*.json  (per-user tokens)
 """
 
-import json
 import logging
 import time
+from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
-TOKEN_FILE = "/documents/token.json"
+TOKEN_FILE     = Path("/documents/token.json")
+USER_TOKEN_DIR = Path("/documents/user_tokens")
+
 SCOPES = [
-    # Google Drive
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
-    # Google Docs
     "https://www.googleapis.com/auth/documents",
-    # Google Slides
     "https://www.googleapis.com/auth/presentations",
-    # Google Sheets
     "https://www.googleapis.com/auth/spreadsheets",
-    # Google Calendar
     "https://www.googleapis.com/auth/calendar",
 ]
 
@@ -38,38 +36,56 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def refresh_once() -> bool:
+def refresh_once(token_path: Path) -> bool:
     """Attempt a single token refresh. Returns True on success."""
+    label = token_path.name
     try:
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        if not token_path.exists():
+            return False  # not yet authorized — silent skip
+
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
 
         if not creds.refresh_token:
-            log.warning("No refresh_token in token.json — cannot auto-refresh. Re-authorize via the OAuth helper.")
+            log.warning("[%s] No refresh_token — cannot auto-refresh.", label)
             return False
 
-        # Refresh even if the token is still valid, so we always have a fresh one
         creds.refresh(Request())
 
-        with open(TOKEN_FILE, "w") as f:
+        with open(token_path, "w") as f:
             f.write(creds.to_json())
 
-        log.info("Token refreshed successfully. New expiry: %s", creds.expiry)
+        log.info("[%s] Refreshed. New expiry: %s", label, creds.expiry)
         return True
 
     except FileNotFoundError:
-        log.warning("token.json not found at %s — skipping refresh (not yet authorized).", TOKEN_FILE)
         return False
     except Exception as e:
-        log.error("Token refresh failed: %s", e)
+        log.error("[%s] Refresh failed: %s", label, e)
         return False
+
+
+def refresh_all() -> None:
+    """Refresh the shared token and every user token."""
+    # Shared / admin token
+    refresh_once(TOKEN_FILE)
+
+    # Per-user tokens
+    if USER_TOKEN_DIR.exists():
+        user_files = list(USER_TOKEN_DIR.glob("*.json"))
+        if user_files:
+            log.info("Refreshing %d user token(s)...", len(user_files))
+            for f in user_files:
+                refresh_once(f)
+    else:
+        # Create the directory so it's ready when users start connecting
+        USER_TOKEN_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def main():
-    log.info("Token refresher started. Refresh interval: %dh", REFRESH_INTERVAL_SECONDS // 3600)
-
+    log.info("Token refresher started. Interval: %dh", REFRESH_INTERVAL_SECONDS // 3600)
     while True:
-        refresh_once()
-        log.info("Next refresh in %d hours.", REFRESH_INTERVAL_SECONDS // 3600)
+        refresh_all()
+        log.info("Next refresh in %dh.", REFRESH_INTERVAL_SECONDS // 3600)
         time.sleep(REFRESH_INTERVAL_SECONDS)
 
 
