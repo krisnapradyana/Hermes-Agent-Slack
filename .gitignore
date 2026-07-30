@@ -5,7 +5,7 @@
 documents/
 
 # Agent runtime memories and SQLite database state
-memory/
+# memory/
 
 # Python compiled files
 __pycache__/

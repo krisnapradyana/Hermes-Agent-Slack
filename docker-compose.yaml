@@ -3,9 +3,15 @@ services:
     image: nousresearch/hermes-agent:latest
     container_name: hermes-local-agent
     restart: unless-stopped
+    environment:
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_KEY=d49fd6a6a4cdca07279873eece668b4f41256f4fa0ff9a03a2cd40b94172cde5
+      - DRIVE_MOUNT_DIR=/gdrive
     ports:
       - "8642:8642"
     volumes:
+      - hermes-data:/opt/data
       - ./config.yaml:/opt/data/custom-config.yaml
       - ./.env:/opt/data/custom-.env
       - ./env_sync.py:/opt/data/env_sync.py
@@ -13,6 +19,7 @@ services:
       - ./memory:/opt/data/memories
       - ./documents:/documents
       - ./soul/SOUL.md:/opt/soul/SOUL.md
+      - /gdrive:/gdrive:rshared
     env_file:
       - .env
     deploy:
@@ -28,13 +35,12 @@ services:
         ln -sf /opt/soul/SOUL.md $$HOME/.hermes/SOUL.md &&
         ln -sf /documents/google_client_secret.json $$HOME/.hermes/google_client_secret.json &&
         ln -sf /documents/token.json $$HOME/.hermes/google_token.json &&
-        ln -sf /opt/data/config.yaml $$HOME/.hermes/config.yaml &&
         mkdir -p /documents/user_tokens &&
         ln -sfn /documents/user_tokens $$HOME/.hermes/user_tokens &&
 
         /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
 
-        /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/media/seedance/scripts/cleanup_temp_files.py &&
+        /opt/hermes/.venv/bin/python3 /opt/data/custom-skills/seedance/scripts/cleanup_temp_files.py &&
         hermes gateway run
       "
     depends_on:
@@ -71,3 +77,42 @@ services:
         limits:
           memory: 128m
 
+  assistant-web:
+    build:
+      context: /home/krisnapradyana/Hermes-Custom-Site
+      args:
+        NEXT_PUBLIC_AUTH_ENABLED: "true"
+    container_name: assistant-web
+    restart: unless-stopped
+
+    environment:
+      - HERMES_API_URL=http://hermes-local-agent:8642
+      - HERMES_API_MODE=openai
+      - HERMES_API_KEY=${API_SERVER_KEY}
+      - HERMES_MODEL=hermes-agent
+      - NEXT_PUBLIC_AUTH_ENABLED=true
+      - AUTH_URL=${ASSISTANT_PUBLIC_URL}
+      - AUTH_SECRET=${ASSISTANT_AUTH_SECRET}
+      - AUTH_SLACK_ID=${AUTH_SLACK_ID}
+      - AUTH_SLACK_SECRET=${AUTH_SLACK_SECRET}
+      - DATA_DIR=/app/data
+      - DRIVE_MOUNT_DIR=/gdrive
+    volumes:
+      - ./assistant-data:/app/data
+      - ./documents:/workspace/documents
+      - /gdrive:/gdrive:rshared
+      - hermes-data:/opt/data:ro
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from spx-assistant.duckdns.org --to assistant-web:3000
+    volumes:
+      - caddy-data:/data
+
+volumes:
+  caddy-data:
+  hermes-data:
