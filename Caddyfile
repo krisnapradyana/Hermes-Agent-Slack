@@ -1,0 +1,7 @@
+spx-assistant.duckdns.org {
+    reverse_proxy assistant-web:3000
+}
+
+clock.spx-assistant.duckdns.org {
+    reverse_proxy attendee-ui:3000
+}
