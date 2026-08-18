@@ -111,8 +111,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    command: caddy reverse-proxy --from spx-assistant.duckdns.org --to assistant-web:3000
     volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
 
 volumes:
