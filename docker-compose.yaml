@@ -8,6 +8,7 @@ services:
       - API_SERVER_HOST=0.0.0.0
       - API_SERVER_KEY=d49fd6a6a4cdca07279873eece668b4f41256f4fa0ff9a03a2cd40b94172cde5
       - DRIVE_MOUNT_DIR=/gdrive
+      - HERMES_WRITE_SAFE_ROOT=/opt/data:/gdrive
     ports:
       - "8642:8642"
     volumes:
@@ -102,6 +103,7 @@ services:
       - ./documents:/workspace/documents
       - /gdrive:/gdrive:rshared
       - hermes-data:/opt/data:ro
+    networks: [ spx-net ]
 
   caddy:
     image: caddy:2-alpine
@@ -116,3 +118,7 @@ services:
 volumes:
   caddy-data:
   hermes-data:
+
+networks:
+  spx-net:
+    external: true
