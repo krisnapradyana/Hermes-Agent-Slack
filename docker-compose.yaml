@@ -41,25 +41,8 @@ services:
 
         /opt/hermes/.venv/bin/python3 /opt/data/env_sync.py &
 
-        (/opt/hermes/.venv/bin/python3 /opt/data/custom-skills/media/seedance/scripts/cleanup_temp_files.py || true) &&
         hermes gateway run
       "
-    depends_on:
-      - seedance-mcp
-
-  seedance-mcp:
-    build: ./mcp-seedance
-    container_name: seedance-mcp-server
-    restart: unless-stopped
-    environment:
-      - ARK_API_KEY=${ARK_API_KEY}
-      - MCP_PORT=8765
-    ports:
-      - "8765:8765"
-    deploy:
-      resources:
-        limits:
-          memory: 256m
 
   oauth-helper:
     build: ./oauth-helper

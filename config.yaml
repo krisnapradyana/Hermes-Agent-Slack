@@ -22,12 +22,8 @@ cron:
   wrap_response: false
 
 # ── MCP Servers ──────────────────────────────────────────────────────────────
-mcp_servers:
-  seedance:
-    # Local BytePlus Ark MCP server (StreamableHTTP transport)
-    url: http://seedance-mcp:8765/mcp
-    connect_timeout: 30
-    timeout: 900
+# (seedance MCP removed — service retired from the stack)
+mcp_servers: {}
 
 # ── Skills Configuration ──────────────────────────────────────────────────────
 skills:
