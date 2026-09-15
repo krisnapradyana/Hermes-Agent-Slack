@@ -64,6 +64,17 @@ Rules:
   member without a linked Slack account, etc.). Fix and retry once; if it
   still fails, tell the user the error text.
 
+## List a member's open tasks
+
+```bash
+curl -s "http://assistant-web:3000/api/internal/tasks?assignee=U0XXXXXXX" \
+  -H "x-internal-token: $INTERNAL_TOKEN"
+```
+
+`assignee` is a Slack id — resolve names via the member directory first.
+Returns `{tasks:[{id, projectId, title, phase, status, dueDate, ...}]}` —
+open tasks only, soonest deadline first.
+
 ## Member directory (read + link)
 
 ```bash
