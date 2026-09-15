@@ -16,6 +16,11 @@ gateway:
   # Only send the final result for background/cron jobs, not every step
   background_notifications: result
 
+cron:
+  # No "Cronjob Response: ... (job_id: ...)" header or "To stop or manage
+  # this job..." footer on cron deliveries — just the message itself.
+  wrap_response: false
+
 # ── MCP Servers ──────────────────────────────────────────────────────────────
 mcp_servers:
   seedance:

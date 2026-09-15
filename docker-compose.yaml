@@ -98,14 +98,27 @@ services:
       - AUTH_SLACK_SECRET=${AUTH_SLACK_SECRET}
       - DATA_DIR=/app/data
       - DRIVE_MOUNT_DIR=/gdrive
+      # Timeclock / Team Pulse integration (same token as attendee-ui's .env.local)
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+      - TIMECLOCK_URL=http://attendee-ui:3000
+      # Task-assignment DMs, sent as the Hermes Slack bot
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      # Member Directory bootstrap admins (comma-separated Slack ids) —
+      # gets you in before any directory record has a Slack id linked
+      - ADMIN_SLACK_IDS=${ADMIN_SLACK_IDS}
+      # Share the login across subdomains (directory.*) — one sign-in for all
+      - COOKIE_DOMAIN=spx-assistant.duckdns.org
     volumes:
       - ./assistant-data:/app/data
       - ./documents:/workspace/documents
       - /gdrive:/gdrive:rshared
       - hermes-data:/opt/data:ro
-    networks: [ spx-net ]
+    # Both networks: spx-net for caddy/attendee-ui, default for hermes-local-agent.
+    networks: [ spx-net, default ]
 
   caddy:
+    # Must see BOTH backends: assistant-web + attendee-ui live on spx-net.
+    networks: [ spx-net, default ]
     image: caddy:2-alpine
     restart: unless-stopped
     ports:

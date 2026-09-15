@@ -5,3 +5,10 @@ spx-assistant.duckdns.org {
 clock.spx-assistant.duckdns.org {
     reverse_proxy attendee-ui:3000
 }
+
+# Member Directory — same assistant-web container, second front door.
+# The app's middleware sees the directory.* Host header and serves the
+# directory screen for every page path on this host.
+directory.spx-assistant.duckdns.org {
+    reverse_proxy assistant-web:3000
+}
