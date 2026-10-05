@@ -1,11 +1,11 @@
 ---
 name: channel-summarizer
-description: "Read all chat history in the current channel and summarize it, with optional date range filtering."
-version: 3.0.0
+description: "Read the chat history of any Slack channel — including the channel this conversation is happening in — and summarize, recap, or answer questions about it. Use for ANY request about what was said, discussed, decided, or missed in a channel, even when the user never says 'summarize': catch me up, what did I miss, what happened here, what's been going on, remember this channel / what we discussed, recap, tl;dr, who said what, what did the team decide, rangkum, ringkas, rekap channel ini. Supports date-range filtering (last week, December, Q1)."
+version: 3.1.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [summarize, channel, history, catch up, chat history, read channel, date range, since, recap]
+    tags: [summarize, summary, channel, history, catch up, catch me up, what did i miss, what happened, whats been going on, chat history, read channel, read messages, this channel, here, remember, recall, recap, tldr, digest, review, discussion, decisions, date range, since, until, last week, rangkum, ringkas, rekap]
     related_skills: []
 ---
 
@@ -33,11 +33,62 @@ metadata:
 
 **A pre-installed script exists for this. Use it. Period.**
 
+**NEVER install anything for this skill.** The script has ZERO external
+dependencies (Python stdlib + curl only). Do NOT `pip install` slack_sdk or
+anything else, and do NOT write your own fetch script. If you are tempted to
+install something, you are doing it wrong — run the pre-installed script.
+
+---
+
+## When this skill applies (implicit requests count!)
+
+Users almost never say the word "skill" or "summarize". ALL of these mean
+"run the fetch script and summarize the result":
+
+- "catch me up" / "what did I miss?" / "what's been going on?"
+- "what happened in this channel?" / "what happened here last week?"
+- "do you remember what we discussed?" / "remember this channel"
+- "what did the team decide about X?" / "who said what about X?"
+- "recap" / "tl;dr" / "give me a digest"
+- Indonesian: "rangkum channel ini", "ringkas obrolan", "rekap chat"
+
+You are stateless between conversations — you do NOT remember past channel
+messages on your own. The ONLY way to "remember" or know what was said in a
+channel is to fetch its history with this script. So any question about past
+channel content ⇒ run the script first, then answer from the transcript.
+
+---
+
+## Current channel ("this channel", "here", the channel you reside in)
+
+When the user says "this channel", "here", or just asks what happened without
+naming a channel, they mean **the channel the current message came from**.
+Its channel ID is already in your conversation context (the Slack channel ID
+of this very conversation, format `C…`/`G…`). Use it directly — NEVER ask the
+user for a channel ID in that case.
+
 ---
 
 ## Pre-installed Script
 
 Script path: `/opt/data/custom-skills/communication/channel-summarizer/fetch_history.py`
+
+### First-run check (one time only)
+
+Before the very first use, verify the script is in place — once, never again:
+
+```bash
+[ -f /opt/data/.channel-summarizer-ready ] || { test -f /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py && touch /opt/data/.channel-summarizer-ready && echo READY; }
+```
+
+- If the marker `/opt/data/.channel-summarizer-ready` already exists, skip
+  this entirely and just run the script.
+- If the script file is missing, report:
+  `⛔ fetch_history.py is missing from custom-skills. Ask your admin to check the skills mount.`
+  Do NOT recreate it, download anything, or install a replacement.
+
+There is nothing to install — ever. The script runs on the container's
+Python as-is.
 
 ---
 
@@ -136,6 +187,9 @@ Activate when the user says:
 - "read channel history"
 - "recap this channel"
 - "what happened before you joined?"
+- "remember this channel" / "do you remember what we discussed?"
+- "what's been going on here?" / "what did the team decide?"
+- "rangkum / ringkas / rekap channel ini"
 - "summarize last [month/week/period]" → use `--since` / `--until`
 - "what happened in [month/quarter/year]?" → use `--since` / `--until`
 - "summarize messages from [date] to [date]" → use `--since` / `--until`
