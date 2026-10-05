@@ -1,6 +1,11 @@
 # Environment variables and secrets
 .env
 
+# Assistant web app runtime data (projects, chats, tasks, member directory,
+# timeclock, briefs) — NEVER in git. Committing this once + a hard reset
+# deleted it all on 2026-09-15; recovered from the reflog. Learn from us.
+assistant-data/
+
 # Generated videos and client credentials
 documents/
 
