@@ -1,11 +1,11 @@
 ---
 name: channel-summarizer
-description: "Read the chat history of any Slack channel — including the channel this conversation is happening in — and summarize, recap, or answer questions about it. Use for ANY request about what was said, discussed, decided, or missed in a channel, even when the user never says 'summarize': catch me up, what did I miss, what happened here, what's been going on, remember this channel / what we discussed, recap, tl;dr, who said what, what did the team decide, rangkum, ringkas, rekap channel ini. Supports date-range filtering (last week, December, Q1)."
-version: 3.1.0
+description: "Read the chat history of any Slack channel OR a single thread — including the channel/thread this conversation is happening in — and summarize, recap, or answer questions about it, INCLUDING attached images/screenshots (downloadable for viewing). Use for ANY request about what was said, discussed, decided, shared, or missed, even when the user never says 'summarize': catch me up, what did I miss, what happened here, read this thread, what's this thread about, remember this channel / what we discussed, recap, tl;dr, who said what, what did the team decide, look at the image/screenshot above, rangkum, ringkas, rekap, baca thread ini, lihat gambar di atas. Supports date-range filtering (last week, December, Q1)."
+version: 3.2.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [summarize, summary, channel, history, catch up, catch me up, what did i miss, what happened, whats been going on, chat history, read channel, read messages, this channel, here, remember, recall, recap, tldr, digest, review, discussion, decisions, date range, since, until, last week, rangkum, ringkas, rekap]
+    tags: [summarize, summary, channel, history, catch up, catch me up, what did i miss, what happened, whats been going on, chat history, read channel, read messages, this channel, here, thread, this thread, read thread, above, remember, recall, recap, tldr, digest, review, discussion, decisions, image, images, screenshot, picture, photo, attachment, look at, date range, since, until, last week, rangkum, ringkas, rekap, baca, lihat, gambar]
     related_skills: []
 ---
 
@@ -50,7 +50,11 @@ Users almost never say the word "skill" or "summarize". ALL of these mean
 - "do you remember what we discussed?" / "remember this channel"
 - "what did the team decide about X?" / "who said what about X?"
 - "recap" / "tl;dr" / "give me a digest"
-- Indonesian: "rangkum channel ini", "ringkas obrolan", "rekap chat"
+- "read this thread" / "what's this thread about" / being tagged mid-thread
+  with a question about the discussion above you
+- "look at the image/screenshot above" / "what does that screenshot say"
+- Indonesian: "rangkum channel ini", "ringkas obrolan", "rekap chat",
+  "baca thread ini", "lihat gambar di atas"
 
 You are stateless between conversations — you do NOT remember past channel
 messages on your own. The ONLY way to "remember" or know what was said in a
@@ -99,6 +103,8 @@ Python as-is.
 | `--limit N` | `250` | Max root messages when no date range is set |
 | `--since DATE` | *(none)* | Fetch messages on or after this date (UTC) |
 | `--until DATE` | *(none)* | Fetch messages on or before this date (UTC) |
+| `--thread TS` | *(none)* | Fetch ONE thread only (TS = root message's Slack timestamp) |
+| `--download-images [N]` | off / `5` | Download the newest N image attachments to `/tmp` for viewing |
 
 **Accepted date formats:**
 - `YYYY-MM-DD` → e.g. `2024-12-01`
@@ -138,7 +144,47 @@ python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.p
 
 ---
 
-### Case 4 — Date range (most common for historical queries)
+### Case 4 — ONE thread (tagged in a thread, or "read/summarize this thread")
+
+```bash
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --thread <THREAD_TS>
+```
+
+`<THREAD_TS>` is the Slack timestamp of the thread's ROOT message (format
+`1759640000.123456`). When you are replying inside a thread, that timestamp
+is in your conversation context — use it directly, never ask the user for it.
+
+**When you are tagged inside a thread, ALWAYS run this FIRST and answer from
+the transcript.** Never ask the user to repeat or re-explain what is above
+you in the thread — read it yourself.
+
+---
+
+### Case 5 — Images and screenshots in the history
+
+```bash
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --download-images
+# or for one thread:
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --thread <THREAD_TS> --download-images
+```
+
+Use when the user asks about a picture, screenshot, render, or attachment in
+the history ("look at the image above", "what does that screenshot say",
+"lihat gambar di atas"). The script downloads the newest 5 image attachments
+(pass a number for more, max 20) to `/tmp/hermes_gen_slackimg_*` and prints
+the local paths in an `IMAGES SAVED FOR VIEWING` section.
+
+- **Open those `/tmp/...` paths with your image-viewing capability**, then
+  answer from what you see.
+- If you cannot view image files, say so honestly and describe only the
+  filenames/senders — do not guess at image content.
+- If a line says `download refused (bot token likely missing the files:read
+  scope)`, report exactly that to the user so the admin can add the scope.
+- The files are temporary (`/tmp`, auto-cleaned) — never promise they persist.
+
+---
+
+### Case 6 — Date range (most common for historical queries)
 
 ```bash
 python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD --until YYYY-MM-DD
@@ -189,7 +235,9 @@ Activate when the user says:
 - "what happened before you joined?"
 - "remember this channel" / "do you remember what we discussed?"
 - "what's been going on here?" / "what did the team decide?"
-- "rangkum / ringkas / rekap channel ini"
+- "read this thread" / tagged in a thread → `--thread <TS>` FIRST, then answer
+- "look at the image/screenshot above" → `--download-images`, then view
+- "rangkum / ringkas / rekap channel ini" / "baca thread ini" / "lihat gambar"
 - "summarize last [month/week/period]" → use `--since` / `--until`
 - "what happened in [month/quarter/year]?" → use `--since` / `--until`
 - "summarize messages from [date] to [date]" → use `--since` / `--until`

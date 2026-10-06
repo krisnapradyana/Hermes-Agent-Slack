@@ -7,12 +7,19 @@ date range filtering.
 
 Usage:
     python3 fetch_history.py <CHANNEL_ID> [--limit N] [--since DATE] [--until DATE]
+                             [--thread TS] [--download-images [N]]
 
 Arguments:
     CHANNEL_ID      Slack channel ID (e.g. C0B9YPS8HDZ)
     --limit N       Max root messages to fetch (default: 250; ignored when date range is set)
     --since DATE    Fetch messages on or after this date/datetime (UTC)
     --until DATE    Fetch messages on or before this date/datetime (UTC)
+    --thread TS     Fetch ONE thread only (TS = the thread root's Slack timestamp,
+                    e.g. 1759640000.123456). Ignores --limit/--since/--until.
+    --download-images [N]
+                    Also download the newest N image attachments (default 5) to
+                    /tmp/hermes_gen_slackimg_* and list their local paths, so a
+                    vision-capable agent can open them.
 
 Date formats accepted for --since / --until:
     YYYY-MM-DD                e.g. 2024-12-01
@@ -36,6 +43,7 @@ Required Slack scopes:
 import subprocess
 import json
 import os
+import re
 import sys
 import argparse
 from datetime import datetime, timezone, timedelta
@@ -198,6 +206,65 @@ def format_ts(ts: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Image Attachments
+# ---------------------------------------------------------------------------
+
+# (ts, author, file_object) for every image attachment seen while formatting.
+ImgRef = tuple  # (str, str, dict)
+
+IMG_DIR = "/tmp"
+# Prefix rides the agent's existing cleanup sweep (temp_patterns: hermes_gen_*).
+IMG_PREFIX = "hermes_gen_slackimg"
+
+
+def collect_images(msg: dict, author: str, images: list | None) -> None:
+    """Remember image attachments on a message for optional download later."""
+    if images is None:
+        return
+    for f in msg.get("files", []):
+        if (f.get("mimetype") or "").startswith("image/"):
+            images.append((msg.get("ts", ""), author, f))
+
+
+def download_images(images: list, token: str, max_n: int) -> list[str]:
+    """
+    Download the NEWEST max_n image attachments with the bot token
+    (requires the files:read scope). Returns printable result lines.
+    """
+    lines: list[str] = []
+    newest = sorted(images, key=lambda x: x[0])[-max_n:]
+    for i, (ts, author, f) in enumerate(newest, 1):
+        url = f.get("url_private_download") or f.get("url_private")
+        name = re.sub(r"[^\w.-]+", "_", f.get("name") or f"file{i}")
+        if not url:
+            lines.append(f"[{format_ts(ts)}] {author}: {name} — no downloadable URL")
+            continue
+        path = os.path.join(IMG_DIR, f"{IMG_PREFIX}_{i}_{name}")
+        r = subprocess.run(
+            ["curl", "-s", "-L", "-o", path, url, "-H", f"Authorization: Bearer {token}"],
+            capture_output=True,
+            text=True,
+        )
+        ok = r.returncode == 0 and os.path.exists(path) and os.path.getsize(path) > 0
+        if ok:
+            # Slack serves an HTML page instead of bytes when the token lacks
+            # files:read — detect it so the agent never "views" an error page.
+            with open(path, "rb") as fh:
+                head = fh.read(64).lstrip()
+            if head.startswith(b"<") :
+                os.unlink(path)
+                lines.append(
+                    f"[{format_ts(ts)}] {author}: {name} — download refused "
+                    "(bot token likely missing the files:read scope)"
+                )
+                continue
+            lines.append(f"[{format_ts(ts)}] {author}: {path} (original: {f.get('name')})")
+        else:
+            lines.append(f"[{format_ts(ts)}] {author}: {name} — download failed")
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # Thread Reply Fetcher
 # ---------------------------------------------------------------------------
 
@@ -206,6 +273,7 @@ def fetch_thread_replies(
     thread_ts: str,
     token: str,
     user_map: dict[str, str],
+    images: list | None = None,
 ) -> list[str]:
     """
     Fetch all replies for a thread. Skips the first item (root message duplicate).
@@ -243,8 +311,76 @@ def fetch_thread_replies(
 
         for f in reply.get("files", []):
             lines.append(f"      [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
+        collect_images(reply, author, images)
 
     return lines
+
+
+# ---------------------------------------------------------------------------
+# Single-Thread Mode
+# ---------------------------------------------------------------------------
+
+def fetch_thread(channel_id: str, thread_ts: str, download_imgs: int) -> None:
+    """Print ONE thread (root + every reply) as a chronological transcript."""
+    token = get_token()
+    print(f"Fetching thread {thread_ts}...", file=sys.stderr)
+
+    url = (
+        f"https://slack.com/api/conversations.replies"
+        f"?channel={channel_id}&ts={thread_ts}&limit=1000"
+    )
+    data = slack_get(url, token)
+    if not data.get("ok"):
+        error = data.get("error", "unknown_error")
+        print(f"Error fetching thread: {error}", file=sys.stderr)
+        if error == "thread_not_found":
+            print("Check the thread timestamp — it must be the ROOT message's ts.", file=sys.stderr)
+        sys.exit(1)
+    messages = data.get("messages", [])
+    while data.get("has_more"):
+        cursor = data.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
+            break
+        data = slack_get(url + f"&cursor={cursor}", token)
+        messages.extend(data.get("messages", []))
+
+    if not messages:
+        print("Thread is empty or not found.")
+        return
+
+    user_map = build_user_map(messages, token)
+    images: list | None = [] if download_imgs > 0 else None
+    out: list[str] = []
+    for i, msg in enumerate(messages):
+        subtype = msg.get("subtype", "")
+        text = msg.get("text", "").strip()
+        if subtype in _SKIP_SUBTYPES:
+            continue
+        uid = msg.get("user") or msg.get("bot_id", "")
+        author = user_map.get(uid, uid or "Bot")
+        text = resolve_mentions(text, user_map)
+        prefix = "" if i == 0 else "    ↳ "
+        if text or msg.get("files"):
+            out.append(f"{prefix}[{format_ts(msg.get('ts', ''))}] {author}: {text}")
+        for f in msg.get("files", []):
+            out.append(f"{prefix}  [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
+        collect_images(msg, author, images)
+
+    print(f"--- THREAD ({len(messages)} messages, root first) ---")
+    print("\n".join(out))
+    print("--- END OF THREAD ---")
+    if images is not None:
+        print_image_section(images, token, download_imgs)
+
+
+def print_image_section(images: list, token: str, max_n: int) -> None:
+    if not images:
+        print("--- NO IMAGE ATTACHMENTS FOUND ---")
+        return
+    lines = download_images(images, token, max_n)
+    print(f"--- IMAGES SAVED FOR VIEWING (newest {min(max_n, len(images))} of {len(images)}) ---")
+    print("\n".join(lines))
+    print("--- END OF IMAGES — open the /tmp/... paths with your image viewer ---")
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +455,7 @@ def fetch_history(
     limit: int = 250,
     oldest_ts: float | None = None,
     latest_ts: float | None = None,
+    download_imgs: int = 0,
 ) -> None:
     token = get_token()
 
@@ -342,6 +479,7 @@ def fetch_history(
 
     # Build chronological transcript (API returns newest-first)
     output_lines: list[str] = []
+    images: list | None = [] if download_imgs > 0 else None
     thread_count = 0
     reply_count = 0
 
@@ -358,12 +496,13 @@ def fetch_history(
 
         for f in msg.get("files", []):
             output_lines.append(f"  [File: {f.get('name', 'unknown')} — {f.get('mimetype', '')}]")
+        collect_images(msg, author, images)
         for a in msg.get("attachments", []):
             title = a.get("title") or a.get("text", "")[:60] or "attachment"
             output_lines.append(f"  [Attachment: {title}]")
 
         if msg.get("reply_count", 0) > 0:
-            thread_lines = fetch_thread_replies(channel_id, msg["ts"], token, user_map)
+            thread_lines = fetch_thread_replies(channel_id, msg["ts"], token, user_map, images)
             if thread_lines:
                 output_lines.extend(thread_lines)
                 thread_count += 1
@@ -376,6 +515,8 @@ def fetch_history(
     )
     print("\n".join(output_lines))
     print("--- END OF HISTORY ---")
+    if images is not None:
+        print_image_section(images, token, download_imgs)
 
 
 # ---------------------------------------------------------------------------
@@ -425,10 +566,31 @@ Examples:
         metavar="DATE",
         help="Fetch messages on or before this date (UTC). Format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS",
     )
+    parser.add_argument(
+        "--thread",
+        metavar="TS",
+        help="Fetch ONE thread only — TS is the thread ROOT message's Slack timestamp.",
+    )
+    parser.add_argument(
+        "--download-images",
+        nargs="?",
+        const=5,
+        default=0,
+        type=int,
+        metavar="N",
+        help="Also download the newest N image attachments (default 5 when flag given) "
+        "to /tmp for viewing.",
+    )
     args = parser.parse_args()
 
     if args.limit < 1:
         parser.error("--limit must be a positive integer")
+    if args.download_images < 0 or args.download_images > 20:
+        parser.error("--download-images must be between 0 and 20")
+
+    if args.thread:
+        fetch_thread(args.channel_id, args.thread, args.download_images)
+        return
 
     oldest_ts = parse_date(args.since, end_of_day=False) if args.since else None
     latest_ts = parse_date(args.until, end_of_day=True) if args.until else None
@@ -436,7 +598,7 @@ Examples:
     if oldest_ts and latest_ts and oldest_ts > latest_ts:
         parser.error("--since date must be earlier than --until date")
 
-    fetch_history(args.channel_id, args.limit, oldest_ts, latest_ts)
+    fetch_history(args.channel_id, args.limit, oldest_ts, latest_ts, args.download_images)
 
 
 if __name__ == "__main__":
