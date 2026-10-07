@@ -1,12 +1,12 @@
 ---
 name: assistant-tasks
-description: "Create tasks on SuperPixel Assistant project boards, list projects, read the member directory, and link members' Slack accounts — all via the assistant web app's internal HTTP API. Use when asked to add/create/assign a task, or to look up projects or team members."
-version: 1.0.0
+description: "Create tasks AND create/update projects on the SuperPixel Assistant (the studio's single source of truth for project info), list projects, read the member directory, and link members' Slack accounts — all via the assistant web app's internal HTTP API. Use when asked to add/create/assign a task, create a project (e.g. from a brief in this channel), change a project's deadline/start date/description/tags, or look up projects or team members. Entering it here updates every surface — dashboard, schedule, clock, constellation — with no retyping."
+version: 1.1.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [task, tasks, assign, assignment, project, board, todo, deadline, member, directory, roster, team]
-    related_skills: []
+    tags: [task, tasks, assign, assignment, project, projects, create project, new project, board, todo, deadline, change deadline, start date, reschedule, postpone, tags, flagship, brief, sow, member, directory, roster, team, buat project, ubah deadline]
+    related_skills: [channel-summarizer, document-reader]
 ---
 
 # SuperPixel Assistant — Tasks & Directory API
@@ -30,7 +30,61 @@ curl -s http://assistant-web:3000/api/internal/projects \
   -H "x-internal-token: $INTERNAL_TOKEN"
 ```
 
-Returns `{projects: [{id, name, color, createdBy}]}`.
+Returns `{projects: [{id, name, color, createdBy, description, startDate, deadline, tags, doneAt}]}`.
+
+## Create a project (e.g. from a brief in the channel)
+
+When someone asks you to create a project — especially "from this brief" /
+"from the SOW above" — FIRST read the brief (channel-summarizer `--thread` /
+document-reader for attached PDFs), extract name, dates, and a 1–3 sentence
+description, then create it. Never ask the user to retype information that
+is already in the brief.
+
+```bash
+curl -s -X POST http://assistant-web:3000/api/internal/projects \
+  -H "x-internal-token: $INTERNAL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{
+    "name": "HHN14 RaveYard Pre-Show",
+    "description": "Additional pre-show dance instructional content for Halloween Horror Nights 14.",
+    "startDate": "2026-10-10",
+    "deadline": "2026-10-25",
+    "tags": ["high-budget"],
+    "slackChannel": "#proj-raveyard-hhn2026",
+    "createdBy": {"name": "Krisna", "slackId": "U0XXXXXXX"}
+  }'
+```
+
+Rules:
+- `name` is required; everything else optional. Dates are `YYYY-MM-DD`.
+- `tags`: any of `flagship`, `high-budget`, `retainer`, `first-client`.
+- `createdBy`: the Slack user who ASKED you (their display name + Slack id
+  from the conversation) — never invent someone.
+- 409 means a project with that name already exists — update it instead.
+- On success, repeat the `summary` field to the user as confirmation.
+
+## Update a project (deadline, dates, description, tags)
+
+"Move the NEON deadline to Nov 3", "retag X as flagship", "update the
+description". One call — it propagates to the dashboard, schedule, clock and
+constellation automatically; never tell the user to also edit it elsewhere.
+
+```bash
+curl -s -X PATCH http://assistant-web:3000/api/internal/projects \
+  -H "x-internal-token: $INTERNAL_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"project": "NEON", "deadline": "2026-11-03"}'
+```
+
+Rules:
+- `project`: id or name (case-insensitive, unique partial works).
+- Updatable: `name`, `description`, `startDate`, `deadline`, `tags`,
+  `slackChannel`. Send `null` for a date to clear it.
+- NOT updatable here (the API will refuse): `doneAt` (projects are marked
+  done via the web app's wrap-up flow — flagship projects require a
+  post-mortem first), `archived`, folders. If asked, explain that and link
+  the project page.
+- On success, repeat the `summary` to the user.
 
 ## Create a task
 
