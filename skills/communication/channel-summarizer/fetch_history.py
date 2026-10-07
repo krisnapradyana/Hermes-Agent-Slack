@@ -20,6 +20,13 @@ Arguments:
                     Also download the newest N image attachments (default 5) to
                     /tmp/hermes_gen_slackimg_* and list their local paths, so a
                     vision-capable agent can open them.
+    --download-files [N]
+                    Like --download-images but for ALL attachment types (PDF,
+                    DOCX, TXT, CSV, images, ...). Documents can then be read
+                    with the document-reader skill's extraction snippet.
+    --list-channels List every channel the bot is a member of (id + name),
+                    for workspace-wide summaries. No CHANNEL_ID needed: pass
+                    "-" as the channel id.
 
 Date formats accepted for --since / --until:
     YYYY-MM-DD                e.g. 2024-12-01
@@ -209,30 +216,31 @@ def format_ts(ts: str) -> str:
 # Image Attachments
 # ---------------------------------------------------------------------------
 
-# (ts, author, file_object) for every image attachment seen while formatting.
+# (ts, author, file_object) for every attachment seen while formatting.
 ImgRef = tuple  # (str, str, dict)
 
 IMG_DIR = "/tmp"
 # Prefix rides the agent's existing cleanup sweep (temp_patterns: hermes_gen_*).
-IMG_PREFIX = "hermes_gen_slackimg"
+IMG_PREFIX = "hermes_gen_slackfile"
 
 
-def collect_images(msg: dict, author: str, images: list | None) -> None:
-    """Remember image attachments on a message for optional download later."""
-    if images is None:
+def collect_images(msg: dict, author: str, sink: list | None) -> None:
+    """Remember ALL attachments on a message for optional download later."""
+    if sink is None:
         return
     for f in msg.get("files", []):
-        if (f.get("mimetype") or "").startswith("image/"):
-            images.append((msg.get("ts", ""), author, f))
+        sink.append((msg.get("ts", ""), author, f))
 
 
-def download_images(images: list, token: str, max_n: int) -> list[str]:
+def download_images(atts: list, token: str, max_n: int, images_only: bool) -> list[str]:
     """
-    Download the NEWEST max_n image attachments with the bot token
-    (requires the files:read scope). Returns printable result lines.
+    Download the NEWEST max_n attachments with the bot token (requires the
+    files:read scope). images_only restricts to image/* mimetypes.
+    Returns printable result lines.
     """
     lines: list[str] = []
-    newest = sorted(images, key=lambda x: x[0])[-max_n:]
+    pool = [a for a in atts if not images_only or (a[2].get("mimetype") or "").startswith("image/")]
+    newest = sorted(pool, key=lambda x: x[0])[-max_n:]
     for i, (ts, author, f) in enumerate(newest, 1):
         url = f.get("url_private_download") or f.get("url_private")
         name = re.sub(r"[^\w.-]+", "_", f.get("name") or f"file{i}")
@@ -320,7 +328,7 @@ def fetch_thread_replies(
 # Single-Thread Mode
 # ---------------------------------------------------------------------------
 
-def fetch_thread(channel_id: str, thread_ts: str, download_imgs: int) -> None:
+def fetch_thread(channel_id: str, thread_ts: str, download_imgs: int, images_only: bool = True) -> None:
     """Print ONE thread (root + every reply) as a chronological transcript."""
     token = get_token()
     print(f"Fetching thread {thread_ts}...", file=sys.stderr)
@@ -370,17 +378,49 @@ def fetch_thread(channel_id: str, thread_ts: str, download_imgs: int) -> None:
     print("\n".join(out))
     print("--- END OF THREAD ---")
     if images is not None:
-        print_image_section(images, token, download_imgs)
+        print_image_section(images, token, download_imgs, images_only)
 
 
-def print_image_section(images: list, token: str, max_n: int) -> None:
-    if not images:
-        print("--- NO IMAGE ATTACHMENTS FOUND ---")
+def print_image_section(atts: list, token: str, max_n: int, images_only: bool) -> None:
+    kind = "IMAGE" if images_only else "FILE"
+    pool = [a for a in atts if not images_only or (a[2].get("mimetype") or "").startswith("image/")]
+    if not pool:
+        print(f"--- NO {kind} ATTACHMENTS FOUND ---")
         return
-    lines = download_images(images, token, max_n)
-    print(f"--- IMAGES SAVED FOR VIEWING (newest {min(max_n, len(images))} of {len(images)}) ---")
+    lines = download_images(atts, token, max_n, images_only)
+    print(f"--- {kind}S SAVED (newest {min(max_n, len(pool))} of {len(pool)}) ---")
     print("\n".join(lines))
-    print("--- END OF IMAGES — open the /tmp/... paths with your image viewer ---")
+    print(
+        f"--- END OF {kind}S — view images directly; extract PDF/DOCX text "
+        "with the document-reader skill's snippet ---"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Channel Listing (for workspace-wide summaries)
+# ---------------------------------------------------------------------------
+
+def list_channels() -> None:
+    """Print every channel the bot is a member of: '<id>\t#<name>'."""
+    token = get_token()
+    url = (
+        "https://slack.com/api/users.conversations"
+        "?types=public_channel,private_channel&limit=200&exclude_archived=true"
+    )
+    cursor = ""
+    count = 0
+    while True:
+        data = slack_get(url + (f"&cursor={cursor}" if cursor else ""), token)
+        if not data.get("ok"):
+            print(f"Error listing channels: {data.get('error', 'unknown')}", file=sys.stderr)
+            sys.exit(1)
+        for ch in data.get("channels", []):
+            print(f"{ch.get('id')}\t#{ch.get('name')}")
+            count += 1
+        cursor = data.get("response_metadata", {}).get("next_cursor", "")
+        if not cursor:
+            break
+    print(f"--- {count} channels (bot is a member) ---", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +496,7 @@ def fetch_history(
     oldest_ts: float | None = None,
     latest_ts: float | None = None,
     download_imgs: int = 0,
+    images_only: bool = True,
 ) -> None:
     token = get_token()
 
@@ -516,7 +557,7 @@ def fetch_history(
     print("\n".join(output_lines))
     print("--- END OF HISTORY ---")
     if images is not None:
-        print_image_section(images, token, download_imgs)
+        print_image_section(images, token, download_imgs, images_only)
 
 
 # ---------------------------------------------------------------------------
@@ -581,15 +622,36 @@ Examples:
         help="Also download the newest N image attachments (default 5 when flag given) "
         "to /tmp for viewing.",
     )
+    parser.add_argument(
+        "--download-files",
+        nargs="?",
+        const=5,
+        default=0,
+        type=int,
+        metavar="N",
+        help="Like --download-images but for ALL attachment types (PDF, DOCX, ...).",
+    )
+    parser.add_argument(
+        "--list-channels",
+        action="store_true",
+        help="List channels the bot is a member of, then exit (channel id arg ignored).",
+    )
     args = parser.parse_args()
+
+    if args.list_channels:
+        list_channels()
+        return
 
     if args.limit < 1:
         parser.error("--limit must be a positive integer")
-    if args.download_images < 0 or args.download_images > 20:
-        parser.error("--download-images must be between 0 and 20")
+    for v in (args.download_images, args.download_files):
+        if v < 0 or v > 20:
+            parser.error("--download-images/--download-files must be between 0 and 20")
+    dl_n = args.download_files or args.download_images
+    images_only = args.download_files == 0
 
     if args.thread:
-        fetch_thread(args.channel_id, args.thread, args.download_images)
+        fetch_thread(args.channel_id, args.thread, dl_n, images_only)
         return
 
     oldest_ts = parse_date(args.since, end_of_day=False) if args.since else None
@@ -598,7 +660,7 @@ Examples:
     if oldest_ts and latest_ts and oldest_ts > latest_ts:
         parser.error("--since date must be earlier than --until date")
 
-    fetch_history(args.channel_id, args.limit, oldest_ts, latest_ts, args.download_images)
+    fetch_history(args.channel_id, args.limit, oldest_ts, latest_ts, dl_n, images_only)
 
 
 if __name__ == "__main__":

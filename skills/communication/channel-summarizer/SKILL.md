@@ -1,12 +1,12 @@
 ---
 name: channel-summarizer
-description: "Read the chat history of any Slack channel OR a single thread — including the channel/thread this conversation is happening in — and summarize, recap, or answer questions about it, INCLUDING attached images/screenshots (downloadable for viewing). Use for ANY request about what was said, discussed, decided, shared, or missed, even when the user never says 'summarize': catch me up, what did I miss, what happened here, read this thread, what's this thread about, remember this channel / what we discussed, recap, tl;dr, who said what, what did the team decide, look at the image/screenshot above, rangkum, ringkas, rekap, baca thread ini, lihat gambar di atas. Supports date-range filtering (last week, December, Q1)."
-version: 3.2.0
+description: "Read the chat history of any Slack channel OR a single thread — including the channel/thread this conversation is happening in — and summarize, recap, or answer questions about it, INCLUDING attached images/screenshots AND uploaded documents (PDF, DOCX — downloadable for viewing/reading), and workspace-wide recaps across every channel the bot is in. Use for ANY request about what was said, discussed, decided, shared, uploaded, or missed, even when the user never says 'summarize': catch me up, what did I miss, what happened here, read this thread, what do you think of the doc/file above, did you see any uploaded files, remember this channel, recap, tl;dr, who said what, recent chats across the workspace, rangkum, ringkas, rekap, baca thread ini, lihat gambar/dokumen di atas. Supports date-range filtering (last week, December, Q1)."
+version: 3.3.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [summarize, summary, channel, history, catch up, catch me up, what did i miss, what happened, whats been going on, chat history, read channel, read messages, this channel, here, thread, this thread, read thread, above, remember, recall, recap, tldr, digest, review, discussion, decisions, image, images, screenshot, picture, photo, attachment, look at, date range, since, until, last week, rangkum, ringkas, rekap, baca, lihat, gambar]
-    related_skills: []
+    tags: [summarize, summary, channel, history, catch up, catch me up, what did i miss, what happened, whats been going on, chat history, read channel, read messages, this channel, here, thread, this thread, read thread, above, remember, recall, recap, tldr, digest, review, discussion, decisions, image, images, screenshot, picture, photo, attachment, file, files, uploaded, document, doc, pdf, sow, contract, look at, workspace, all channels, every channel, date range, since, until, last week, rangkum, ringkas, rekap, baca, lihat, gambar, dokumen]
+    related_skills: [document-reader]
 ---
 
 # Channel Summarizer
@@ -105,6 +105,8 @@ Python as-is.
 | `--until DATE` | *(none)* | Fetch messages on or before this date (UTC) |
 | `--thread TS` | *(none)* | Fetch ONE thread only (TS = root message's Slack timestamp) |
 | `--download-images [N]` | off / `5` | Download the newest N image attachments to `/tmp` for viewing |
+| `--download-files [N]` | off / `5` | Same, but ALL attachment types — PDF, DOCX, TXT, CSV, images |
+| `--list-channels` | off | Print every channel the bot is in (`<id>\t#<name>`); pass `-` as channel id |
 
 **Accepted date formats:**
 - `YYYY-MM-DD` → e.g. `2024-12-01`
@@ -184,7 +186,39 @@ the local paths in an `IMAGES SAVED FOR VIEWING` section.
 
 ---
 
-### Case 6 — Date range (most common for historical queries)
+### Case 6 — Documents uploaded EARLIER in the channel/thread
+
+Use when the user asks about a file posted in a previous message — "what do
+you think of the doc above", "did you see any uploaded files", "review the
+SOW Kelvin's team posted" — i.e. the file is NOT attached to the message
+that mentions you, so there is no cached local path.
+
+```bash
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --thread <THREAD_TS> --download-files
+# or channel-wide: ... <CHANNEL_ID> --download-files
+```
+
+Then read each saved PDF/DOCX path with the **document-reader** skill's
+extraction snippet (pymupdf4llm / docx2txt) and answer using its response
+format. Images in the batch you can view directly.
+
+---
+
+### Case 7 — Workspace-wide recap ("recent chats across all channels")
+
+NEVER write your own Slack API code for this. Instead:
+
+```bash
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py - --list-channels
+```
+
+…then run the script per channel of interest (use `--since` to keep each
+fetch small, e.g. the last day or two) and synthesize one summary across the
+transcripts. Skip channels that are clearly irrelevant to the question.
+
+---
+
+### Case 8 — Date range (most common for historical queries)
 
 ```bash
 python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --since YYYY-MM-DD --until YYYY-MM-DD

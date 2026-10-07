@@ -1,12 +1,12 @@
 ---
 name: document-reader
-description: "Read and analyse documents attached in Slack (PDF, DOCX, TXT, CSV, JSON, YAML) and provide summaries and recommendations."
-version: 2.0.0
+description: "Read and analyse documents attached in Slack (PDF, DOCX, TXT, CSV, JSON, YAML) and provide summaries and recommendations — including documents uploaded in EARLIER messages ('the doc above', 'the SOW posted earlier'), fetched via the channel-summarizer skill."
+version: 2.1.0
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [document, pdf, read, analyse, analyze, summarize, summarise, review, contract, report, file, attachment]
-    related_skills: []
+    tags: [document, pdf, docx, read, analyse, analyze, summarize, summarise, review, contract, sow, brief, report, file, attachment, uploaded, doc above, earlier]
+    related_skills: [channel-summarizer]
 ---
 
 # Document Reader & Advisor
@@ -23,12 +23,37 @@ When a user uploads a file to Slack, the message event contains a `files` array.
 
 If Hermes gives you the file content inline (for small text files), use that directly without running any tool.
 
-## Reading a PDF or DOCX with `run_command`
+## File uploaded in an EARLIER message ("the doc above")
 
-Use `run_command` to extract text from PDFs and Word documents:
+If the user asks about a document that was posted in a PREVIOUS message —
+"what do you think of this above", "did you see the uploaded file", "review
+the SOW posted earlier" — there is NO cached local path in your context.
+Do NOT say you can't see it and do NOT write custom Slack API code. Fetch it
+with the channel-summarizer script:
 
 ```bash
-pip install pymupdf4llm docx2txt -q && python3 - << 'EOF'
+python3 /opt/data/custom-skills/communication/channel-summarizer/fetch_history.py <CHANNEL_ID> --thread <THREAD_TS> --download-files
+# (or channel-wide without --thread)
+```
+
+It prints saved `/tmp/...` paths — read those with the extraction snippet
+below, then answer in the Response Format.
+
+## One-time dependency setup (first run only)
+
+Check before installing — install ONLY if the import fails, never on every run:
+
+```bash
+python3 -c "import pymupdf4llm, docx2txt" 2>/dev/null || pip install pymupdf4llm docx2txt -q
+```
+
+## Reading a PDF or DOCX with `run_command`
+
+Use `run_command` to extract text from PDFs and Word documents (after the
+one-time check above — do not prefix this with pip install):
+
+```bash
+python3 - << 'EOF'
 import sys
 
 file_path = "/path/to/the/cached/file.pdf"  # ← replace with actual path
@@ -102,6 +127,8 @@ Anything that would help give better advice.
 
 Activate when the user:
 - Uploads any file to Slack
+- Asks about a file posted EARLIER: "what do you think of this above", "did
+  you see any uploaded files", "review the doc/SOW posted earlier"
 - Says "read this", "analyse this", "summarise this file"
 - Says "give me recommendations based on this document"
 - Says "review my contract / report / spec / proposal"
