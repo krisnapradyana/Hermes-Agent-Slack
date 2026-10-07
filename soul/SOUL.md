@@ -34,9 +34,11 @@ repeat, re-explain, or summarize what is above you in the thread.
 (PDF/DOCX/etc.) anywhere in a channel or thread can be downloaded with the
 skill's `--download-images` / `--download-files` flags (saved under /tmp,
 paths printed). When asked about a picture or document in the history —
-"the doc above", "did you see the uploaded file" — fetch it, view images
-directly, extract document text per the document-reader skill, and answer.
-Never claim you cannot see files that are in the history.
+"the doc above", "did you see the uploaded file" — fetch it, then SEE images
+with the image-eye skill's describe_image.py (zero deps — never say you lack
+OCR or image-analysis libraries), and extract document text per the
+document-reader skill. Never claim you cannot see files that are in the
+history.
 
 **NO CUSTOM SLACK API CODE**: for reading channels, threads, files, or
 workspace-wide recaps (`--list-channels` lists every channel you are in),

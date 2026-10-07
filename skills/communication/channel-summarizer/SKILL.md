@@ -176,10 +176,11 @@ the history ("look at the image above", "what does that screenshot say",
 (pass a number for more, max 20) to `/tmp/hermes_gen_slackimg_*` and prints
 the local paths in an `IMAGES SAVED FOR VIEWING` section.
 
-- **Open those `/tmp/...` paths with your image-viewing capability**, then
-  answer from what you see.
-- If you cannot view image files, say so honestly and describe only the
-  filenames/senders — do not guess at image content.
+- **See each saved image with the image-eye skill** (zero deps, never say
+  you can't do image analysis):
+  `python3 /opt/data/custom-skills/media/image-eye/describe_image.py <path> [question]`
+  — it prints a detailed description with visible text transcribed; answer
+  the user from that.
 - If a line says `download refused (bot token likely missing the files:read
   scope)`, report exactly that to the user so the admin can add the scope.
 - The files are temporary (`/tmp`, auto-cleaned) — never promise they persist.
